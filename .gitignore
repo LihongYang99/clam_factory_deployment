@@ -1,0 +1,30 @@
+# Local credentials and deployment details
+.env
+.env.*
+!.env.example
+arduino_secrets.h
+secrets.h
+*.local.md
+*.local.json
+
+# Measurements, images, and local databases
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Build/runtime output
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pio/
+.codex-build/
+build/
+node_modules/

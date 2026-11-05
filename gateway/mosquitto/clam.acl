@@ -1,0 +1,7 @@
+user clam_node_01
+topic write clam/node_01/telemetry
+topic write clam/node_01/status
+
+user clam_gateway
+topic read clam/+/telemetry
+topic read clam/+/status
