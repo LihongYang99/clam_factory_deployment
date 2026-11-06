@@ -1,8 +1,11 @@
 # Jetson MQTT gateway
 
 First milestone: receive Node 01 telemetry on Jetson `192.168.88.250`.
-The broker configuration is prepared; installation and delivery are not yet
-verified on the Jetson. Storage, API, and dashboard implementation follow this step.
+Owner-provided output on 2026-11-06 confirms Mosquitto is active, enabled at
+boot, and listening on `192.168.88.250:1883`. Node 01 publishing and gateway subscription were verified with two actual
+telemetry messages (sequences 33 and 34, five seconds apart). Negative ACL and
+anonymous-access tests remain pending. The recorder, API, and dashboard are now implemented locally;
+see [dashboard setup](../docs/dashboard_setup.md) for deployment and validation.
 
 ## 1. Install on the Jetson
 
@@ -40,17 +43,54 @@ No `-c` flag is used: it would overwrite an existing password file.
 
 ## 3. Install configuration (Jetson)
 
-Copy this repository's `gateway/mosquitto/` directory to the Jetson first; these
-files may not yet exist in the remote GitHub repository. From that directory:
+### A. Transfer the files from the Mac
+
+Run in a **local Mac terminal**, not inside SSH:
 
 ```bash
-sudo install -o root -g mosquitto -m 640 clam.acl /etc/mosquitto/clam.acl
-sudo install -o root -g root -m 644 clam.conf /etc/mosquitto/conf.d/clam.conf
+scp /Users/lihongyang/Documents/clam_factory_deployment/gateway/mosquitto/clam.conf \
+    /Users/lihongyang/Documents/clam_factory_deployment/gateway/mosquitto/clam.acl \
+    lihong@192.168.88.250:~/
+```
+
+`scp` copies the two local files over SSH into the Jetson user's home directory
+(`/home/lihong`). It uses the Jetson login password. This only stages the files;
+it does not yet change the running broker or copy MQTT passwords.
+
+### B. Activate the configuration on the Jetson
+
+Run in the **Jetson SSH terminal**:
+
+```bash
+sudo install -o root -g mosquitto -m 640 ~/clam.acl /etc/mosquitto/clam.acl
+sudo install -o root -g root -m 644 ~/clam.conf /etc/mosquitto/conf.d/clam.conf
 sudo systemctl enable mosquitto
 sudo systemctl restart mosquitto
 sudo systemctl status mosquitto --no-pager
 sudo ss -ltnp 'sport = :1883'
 ```
+
+Here, `install` means copy a configuration file into its system location and
+set ownership/permissions; it does not install another software package.
+`-o` sets the owner, `-g` the group, and `-m` the permission mode. Mode `640`
+allows the owner to read/write and the group to read; `644` also allows others
+to read. The ACL is readable by the `mosquitto` service group.
+
+| File or command | Purpose |
+| --- | --- |
+| `clam.conf` | Listen on the Jetson LAN address, reject anonymous clients, and load the password and ACL files |
+| `clam.acl` | Allow `clam_node_01` to publish its own telemetry/status and `clam_gateway` to read node telemetry/status |
+| `/etc/mosquitto/clam.passwd` | Previously created MQTT password hashes; neither transferred file contains these passwords |
+| `systemctl enable mosquitto` | Start the broker automatically at boot |
+| `systemctl restart mosquitto` | Restart the broker so it reads the new configuration; temporarily disconnect existing clients |
+| `systemctl status mosquitto` | Check whether the broker process is running |
+| `ss -ltnp 'sport = :1883'` | Show TCP listening sockets on port 1883, with numeric addresses and owning processes |
+
+Before configuration, the observed listeners were `127.0.0.1:1883` and
+`[::1]:1883`, which accept connections only from the Jetson itself. Afterward,
+the observed listener was `192.168.88.250:1883`, allowing LAN clients to attempt
+connections. This does not by itself prove a successful login or sensor delivery;
+verify those in Step 5. This step changes the broker, not the ESP32 firmware.
 
 Expected listener: `192.168.88.250:1883`. This deliberately does not listen on
 Jetson's campus-network address. If startup fails:
@@ -114,3 +154,17 @@ is not database storage; this milestone does not yet save telemetry or serve a p
 
 References: [Mosquitto authentication](https://mosquitto.org/documentation/authentication-methods/)
 and [password utility](https://www.mosquitto.org/man/mosquitto_passwd-1.html).
+
+## Verified Node 01 reception — 2026-11-06
+
+The owner supplied two messages received by `mosquitto_sub` on the Jetson topic
+`clam/node_01/telemetry`, using the gateway account. Sequences 33 and 34 had
+uptimes 161002 and 166002 ms. DO was 6.1542 and 6.1494 mg/L; temperature was
+25.3423 and 25.3202 °C. Both reported `sensor_status=OK`.
+
+`not_forwarded_before_sample` stayed at 27: this is the accumulated count of
+earlier failed forwarding attempts, not 27 new failures per message. There is
+no offline replay queue. Two received messages verify the current acquisition
+and MQTT path, not long-term reliability. Sample UTC remains null/UNSYNCED;
+calibration and compensation remain UNVERIFIED. At that verification point, no database recorder or dashboard was running.
+The new implementation still needs live Jetson verification.

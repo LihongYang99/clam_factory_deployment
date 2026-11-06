@@ -7,10 +7,11 @@ Jetson gateway. No ORP channel or actuator control on this board.
 **Status:** v0.1.3 runtime confirmed by user-provided serial logs: UART0 console,
 Wi-Fi connection, DHCP address, and 5-second polling are working. Sensor reads
 now report OK with DO, saturation, and temperature; sample UTC is UNSYNCED;
-MQTT is intentionally DISABLED until [broker setup](../../gateway/README.md).
+MQTT delivery to Jetson was verified by two subscriber messages on 2026-11-06
+(see [gateway verification](../../gateway/README.md#verified-node-01-reception--2026-11-06)).
 WebFig confirms the active lease is `192.168.88.101` after board reset
-(2026-11-04). Sensor values are received; calibration, compensation, and gateway delivery
-remain unverified.
+(2026-11-04). Sensor values reach the Jetson broker; calibration and compensation remain
+unverified. Database recording and the dashboard are pending.
 See [LAN address reservations](../../docs/network_setup.md) for setup and verification.
 The instructions below target ESP32-S3 N16R8 + SEN0681; stop if your labels differ.
 
@@ -255,10 +256,32 @@ Use Ctrl+C to exit the monitor before uploading again.
 
 ## 7. Enable MQTT when the Jetson is ready
 
-The broker and web backend are not installed by this firmware. Once they exist,
-edit the ignored `arduino_secrets.h` locally and set `MQTT_HOST`, `MQTT_USER`,
-and `MQTT_PASSWORD` to the actual gateway and node-specific broker credentials.
-All three must be nonempty. Recompile and upload again.
+DO reading and Wi-Fi already work; no new sensor code is needed to enable
+publishing. The web backend is not required for an initial MQTT subscriber test.
+
+First complete the [Jetson broker setup](../../gateway/README.md): listener
+`192.168.88.250:1883`, password file, and ACL. An active Mosquitto service alone
+does not confirm LAN access or account configuration.
+
+In the Mac's ignored `firmware/node_01_do/arduino_secrets.h`, set:
+
+```cpp
+constexpr char MQTT_HOST[] = "192.168.88.250";
+constexpr uint16_t MQTT_PORT = 1883;
+constexpr char MQTT_USER[] = "clam_node_01";
+constexpr char MQTT_PASSWORD[] = "YOUR_NODE_MQTT_PASSWORD";
+```
+
+Use the password created for `clam_node_01`, not the Wi-Fi password, Jetson
+login password, or `clam_gateway` password. Keep it local; do not paste it into
+chat or commit it. Preserve the existing Wi-Fi settings. All three MQTT string
+settings must be nonempty; an empty password keeps publishing disabled.
+
+Compile again (Step 3), then upload over the Mac's USB-to-UART port (Step 5).
+Close the serial monitor before uploading. Afterward, confirm
+`mqtt=CONNECTED` in serial status and matching JSON samples in the Jetson
+subscriber described in the gateway guide. A Wi-Fi connection alone does not
+confirm MQTT delivery.
 
 | Setting | Value |
 | --- | --- |

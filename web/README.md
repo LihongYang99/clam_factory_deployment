@@ -1,19 +1,27 @@
-# Monitoring Web Interface
+# Monitoring dashboard
 
-This folder owns the dashboard frontend, separate from sensor firmware and the
-planned `gateway/` backend. No running web page or server is implemented yet.
+Standalone HTML/CSS/JavaScript, served by `gateway/app.py`. No npm install or
+frontend build step. Follow [dashboard setup](../docs/dashboard_setup.md) to
+configure the Jetson receiver and open `http://192.168.88.250:8000`.
 
-First view: Node 01 DO (mg/L), temperature (°C), saturation (%), recent trends,
-last update time, and explicit online/stale/sensor-error states. Use an English,
-responsive, dark industrial layout. Controls and VT branding come later.
+The page polls `/api/node_01` every five seconds and shows DO, temperature,
+saturation, sample quality, receive age, 15-minute/one-hour DO history, and an
+accessible table of recent samples. Pause display pauses browser polling only;
+the recorder continues collecting. No simulated values are included.
 
-The gateway will receive `clam/node_01/telemetry`, record the original payload
-and receive timestamp, and expose readings to this page. The browser must not
-contain Wi-Fi or MQTT credentials or connect directly to the broker.
+Charts use gateway receive time; node UTC is not invented when unsynchronized.
+Old readings remain visible with stale/disconnected labels. Sensor errors are
+separate from reception freshness. The browser never receives MQTT credentials.
 
-The first firmware can be commissioned with USB and Wi-Fi before the gateway
-exists. Its default local configuration has MQTT disabled; this does not yet
-send data to a web page. Next, configure the Jetson broker, implement ingestion
-and storage in `gateway/`, and build the frontend here against its API.
+Design: dark blue-gray instrument panel, cyan water-quality curve, amber quality
+notice, local system fonts, visible keyboard focus and responsive layout. No
+control actions or BOD predictions are included in this first version.
 
-Start with the [Jetson MQTT setup](../gateway/README.md) to verify incoming telemetry.
+Desktop and narrow-window Chrome rendering were inspected locally. Jetson live
+recording and browser verification are pending; see the setup guide's limits.
+
+The header uses the owner-provided horizontal BSE logo at
+`gateway/images/vt-bse-logo.png`, unchanged and at its original aspect ratio.
+It is served locally through `/vt-bse-logo.png` and displayed on a light panel
+for legibility. Sync `web/`, `gateway/images/`, and `gateway/app.py`, then restart
+the gateway when adding or changing the image route.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Clam MQTT recorder and monitoring dashboard
+Wants=network-online.target mosquitto.service
+After=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=lihong
+WorkingDirectory=/home/lihong/clam_factory_deployment
+ExecStart=/home/lihong/clam_factory_deployment/.venv/bin/python gateway/app.py
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

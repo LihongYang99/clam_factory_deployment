@@ -11,7 +11,8 @@ a live monitoring dashboard over the local network.
 UART0 diagnostics, Wi-Fi association, DHCP addressing, and periodic sensor polls.
 User logs now confirm sensor_status=OK with DO, saturation, and temperature.
 Jetson LAN address `192.168.88.250` is owner-confirmed. Clock synchronization,
-MQTT delivery, gateway services, and the dashboard remain pending.
+live deployment of the new recorder/dashboard remains pending. Two actual Node 01
+telemetry messages were received on Jetson over MQTT on 2026-11-06.
 See the [Jetson MQTT setup](gateway/README.md) for the next step.
 
 ## Phase 1: monitor first
@@ -74,8 +75,9 @@ connection status to `clam/node_01/status`; sensor quality is a separate field
 in telemetry. See [gateway setup](gateway/README.md) for commissioning commands.
 
 **Progress (2026-11-06):** the owner confirmed Mosquitto is active and enabled at
-boot after reinstalling Jetson. MQTT account/listener setup and ESP32 delivery
-remain pending; the receiver, database service, and dashboard are not implemented.
+boot after reinstalling Jetson. MQTT account/listener setup and Node 01 delivery are confirmed by two subscriber
+messages. The Python/SQLite recorder and dashboard are implemented locally; follow
+[dashboard setup](docs/dashboard_setup.md) to deploy and verify on Jetson.
 
 ### Which password is which?
 
@@ -175,8 +177,8 @@ monitoring_nodes/
   node_01/firmware/node_01_do/     DO-only Arduino sketch and configuration template
   node_01/tests/                   Host-side sensor protocol checks
   node_02/ ... node_07/            Add node folders as hardware is commissioned
-gateway/                           Receiver, database, and web service (planned)
-web/                               Separate dashboard frontend (README present; UI planned)
+gateway/                           Python MQTT receiver, SQLite storage, HTTP service
+web/                               HTML/CSS/JavaScript monitoring dashboard
 ```
 
 The camera's implementation folder will follow its confirmed hardware type.
