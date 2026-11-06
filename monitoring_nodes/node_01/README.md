@@ -16,16 +16,16 @@ The instructions below target ESP32-S3 N16R8 + SEN0681; stop if your labels diff
 
 ## Hardware to identify
 
-The following parts were recorded in the earlier shrimp project. They are
-reference candidates, not confirmation of the hardware connected for this build.
+Board, probe, and converter models below come from the earlier shrimp project
+and still require label verification. Power details were reported by the owner.
 
 | Part | Reference model | New-project verification |
 | --- | --- | --- |
 | Board | ESP32-S3 N16R8 | Confirm board label and USB port |
 | DO probe | DFRobot SEN0681 | Confirm exact model |
 | Serial converter | Waveshare TTL TO RS485 (B), 23778 | Confirm variant and terminal labels |
-| Probe supply | Separate supply appropriate to the probe | Confirm model and rating |
-| Board supply | USB supply appropriate to the board | Confirm before standalone operation |
+| External power supply | 12 V DC, 5 A rated output | Owner-reported; exact model and distribution wiring pending |
+| Board supply | Regulated 5 V through the board 5V and GND pins | Owner-reported; source of the 5 V rail pending |
 
 Do not connect sensor supply voltage or RS485 A/B directly to ESP32 GPIO.
 The previous installation used GPIO17 TX and GPIO18 RX for DO; these are
@@ -33,6 +33,23 @@ reference assignments only, not a verified wiring instruction for this board.
 Final wiring must describe converter direction, power domains, and grounding
 against the actual parts. The Waveshare documentation could not be fetched
 during this preparation; its electrical details remain unverified here.
+
+## Power connections
+
+The external supply is rated **12 V DC / 5 A**. The ESP32 board is powered
+through its **5V and GND pins**, rather than USB for standalone operation.
+The 5 A rating is the supply's available current, not the board's consumption.
+
+**Never connect the 12 V output directly to the board's 5V pin.** If the board
+shares the 12 V supply, a suitable regulated 12 V-to-5 V converter is required.
+Whether the current 5 V rail comes from a converter or a separate supply has
+not yet been confirmed; record that device and its wiring before finalizing the
+power diagram. Probe and RS485 converter power connections also need to be
+recorded against their actual models.
+
+Before connecting USB for flashing while external 5 V is present, verify the
+board's power-selection/backfeed protection; otherwise disconnect external board
+power for USB debugging. Switch power off before changing wiring.
 
 ## Candidate SEN0681 protocol
 

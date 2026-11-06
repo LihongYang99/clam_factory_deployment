@@ -52,6 +52,49 @@ The Jetson must remain powered on for central recording and dashboard access.
 The Mac does not need to remain attached to a sensor board. Internet access is
 not the telemetry path; the node-to-gateway path is local.
 
+## How MQTT data reaches the dashboard
+
+MQTT is a publish/subscribe messaging protocol. **Mosquitto**, running on the
+Jetson, is the MQTT broker: it accepts messages and forwards them to subscribed
+clients. The router carries the network traffic; the broker runs on the Jetson.
+
+1. Node 01 reads the DO probe over RS485 and decodes the measurements.
+2. The ESP32 connects over Wi-Fi and publishes JSON about every five seconds
+   to `clam/node_01/telemetry` on the broker at `192.168.88.250:1883`.
+3. The Jetson receiver subscribes to `clam/+/telemetry` (`+` matches one node
+   topic level), so additional nodes can use the same receiver.
+4. The receiver will validate and store messages and gateway receive timestamps
+   in SQLite. The web service will expose the stored readings to the dashboard.
+5. Browsers will access the web service over HTTP; MQTT credentials stay out of
+   frontend code.
+
+The broker is a message relay, not the measurement database or dashboard.
+MQTT delivery does not by itself prove a sample was saved. Node 01 also publishes
+connection status to `clam/node_01/status`; sensor quality is a separate field
+in telemetry. See [gateway setup](gateway/README.md) for commissioning commands.
+
+**Progress (2026-11-06):** the owner confirmed Mosquitto is active and enabled at
+boot after reinstalling Jetson. MQTT account/listener setup and ESP32 delivery
+remain pending; the receiver, database service, and dashboard are not implemented.
+
+### Which password is which?
+
+| Credential | Purpose |
+| --- | --- |
+| Wi-Fi password | Connect ESP32 to the router's wireless network |
+| Jetson login password | SSH login and `sudo` as the Linux user `lihong` |
+| MQTT `clam_node_01` password | Authenticate the ESP32 to Mosquitto; planned ACL allows publishing its own telemetry/status |
+| MQTT `clam_gateway` password | Authenticate the receiver to Mosquitto; planned ACL allows reading node telemetry/status |
+
+The two MQTT accounts are broker accounts, not Linux login accounts. Set new,
+separate MQTT passwords when prompted by `mosquitto_passwd`. A preceding
+`[sudo] password for lihong:` prompt still asks for the Jetson login password.
+Account permissions take effect after the broker authentication and ACL files
+are configured. Keep actual passwords only in local ignored configuration.
+
+SSH lets a person operate the Jetson from a Mac; MQTT lets sensor nodes send
+messages automatically. Neither requires keeping the ESP32 attached to the Mac.
+
 ## Node map
 
 Node numbers follow this project's sensor plan, not the older shrimp project's
