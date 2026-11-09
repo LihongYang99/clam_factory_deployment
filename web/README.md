@@ -17,8 +17,19 @@ Design: dark blue-gray instrument panel, cyan water-quality curve, amber quality
 notice, local system fonts, visible keyboard focus and responsive layout. No
 control actions or BOD predictions are included in this first version.
 
-Desktop and narrow-window Chrome rendering were inspected locally. Jetson live
-recording and browser verification are pending; see the setup guide's limits.
+Chrome rendering was checked at 1440, 900, and 390 pixels wide with isolated test
+responses. Checks covered the logo, horizontal overflow, responsive chart labels,
+pause/resume, time window, sample table, stale/empty data, and API failure.
+These checks do not verify live Jetson recording; see the setup guide's limits.
+
+For HTML/CSS/JavaScript-only updates, run this from the Mac repository root:
+
+```bash
+rsync -av web lihong@192.168.88.250:~/clam_factory_deployment/
+```
+
+Refresh the dashboard afterward. A gateway restart is unnecessary for these
+static-file changes.
 
 The header uses the owner-provided horizontal BSE logo at
 `gateway/images/vt-bse-logo.png`, unchanged and at its original aspect ratio.
