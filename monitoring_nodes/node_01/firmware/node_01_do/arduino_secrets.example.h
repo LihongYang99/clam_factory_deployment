@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 // Copy to arduino_secrets.h (Git-ignored); never commit real credentials.
 constexpr char WIFI_SSID[] = "YOUR_2_4_GHZ_SSID";
 constexpr char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
