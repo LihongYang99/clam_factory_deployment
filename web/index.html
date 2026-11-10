@@ -3,17 +3,30 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clam processing water quality dashboard</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body>
 <a class="skip-link" href="#main">Skip to readings</a>
-<header><div class="header-identity"><img class="vt-logo" src="/vt-bse-logo.png" alt="Virginia Tech Biological Systems Engineering — College of Engineering and College of Agriculture and Life Sciences" width="768" height="127"><a href="/" class="brand" aria-label="Clam monitoring home"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 7c6-6 12 6 20 0M2 12c6-6 12 6 20 0M2 17c6-6 12 6 20 0"/></svg> clam<span class="brand-sub">/ field monitoring</span></a></div><span id="connection" role="status">Connecting to gateway…</span></header>
-<main id="main">
-<section class="intro"><div><h1>Clam processing water quality dashboard</h1><p class="sub">Node 01 · Dissolved oxygen station</p></div><div class="timestamp"><span>Last received</span><strong id="received">No samples yet</strong><span id="age">Waiting for telemetry</span></div></section>
+<header><div class="header-identity"><img class="vt-logo" src="/vt-bse-logo.png" alt="Virginia Tech Biological Systems Engineering — College of Engineering and College of Agriculture and Life Sciences" width="768" height="127"><a href="/" class="brand" aria-label="Clam monitoring home"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21C8 18 2 13 2 8a10 7 0 0 1 20 0c0 5-6 10-10 13ZM12 20V3M12 20 6 5M12 20l6-15"/></svg> clam</a></div><span id="connection" role="status">Connecting to gateway…</span></header>
+<div class="workspace">
+<aside class="sidebar"><nav aria-label="Monitoring navigation" id="sensor-nav"></nav></aside>
+<main id="main" tabindex="-1">
+<section class="intro"><div><h1>Clam processing water quality dashboard</h1><p class="sub" id="view-subtitle">Factory monitoring · Overview</p></div><div class="timestamp"><span>Last received</span><strong id="received">No samples yet</strong><span id="age">Waiting for telemetry</span></div></section>
+<section id="overview" aria-labelledby="overview-heading">
+<div class="overview-heading"><div><h2 id="overview-heading">Overview</h2></div></div>
+<p id="overview-status" class="notice" role="status">Waiting for gateway data…</p>
+<div id="overview-groups"></div>
+<p class="overview-footnote">Operating limits not configured.</p>
+</section>
+<section id="planned-view" hidden aria-labelledby="planned-title"><h2 id="planned-title"></h2><p class="planned-state">Not integrated</p><p id="planned-description"></p><dl id="planned-facts"></dl><a href="#overview">Back to overview</a></section>
+<div id="live-detail" hidden>
+<h2 id="detail-title">Dissolved oxygen</h2>
+<p id="temperature-source" class="temperature-source" hidden>Source: Node 01 · DO probe</p>
 <p id="notice" class="notice" role="status">Waiting for the first stored reading. No simulated data is displayed.</p>
 <section class="instrument" aria-label="Latest water quality readings">
 <div class="primary-reading"><span>Dissolved oxygen</span><div><strong id="do">—</strong><span class="unit">mg/L</span></div><span id="sample-state">No sample</span></div>
 <div class="secondary-readings"><div><span>Water temperature</span><p><strong id="temp">—</strong> <span>°C</span></p></div><div><span>Oxygen saturation</span><p><strong id="sat">—</strong> <span>%</span></p></div></div>
-<div class="quality"><h2>Measurement quality</h2><dl><div><dt>Sensor response</dt><dd id="sensor">Unknown</dd></div><div><dt>Node clock</dt><dd id="clock">Unknown</dd></div><div><dt>Calibration</dt><dd id="calibration">Unknown</dd></div><div><dt>Compensation</dt><dd id="compensation">Unknown</dd></div></dl><p class="quality-help">Unverified means not yet confirmed; it does not mean a failed check.</p></div>
+<div class="quality"><h2>Measurement quality</h2><dl><div><dt>Sensor response</dt><dd id="sensor">Unknown</dd></div><div><dt>Node clock</dt><dd id="clock">Unknown</dd></div><div><dt>Calibration</dt><dd id="calibration">Unknown</dd></div><div><dt>Compensation</dt><dd id="compensation">Unknown</dd></div></dl></div>
 </section>
-<section class="trend"><div class="section-top"><div><h2>Dissolved oxygen history</h2><p>Gateway receive time · mg/L · gaps preserve missing readings</p></div><div class="controls"><label for="window">Window</label><select id="window"><option value="15">15 minutes</option><option value="60">1 hour</option></select><button id="pause" type="button" aria-pressed="false">Pause display</button></div></div><div class="plot"><svg id="chart" viewBox="0 0 1000 240" role="img" aria-label="Dissolved oxygen history; no data yet"></svg><p id="empty">Waiting for measurements</p></div><div class="axis"><span id="start">—</span><span>Local browser time</span><span id="end">—</span></div></section>
-<section class="details"><div><h2>Acquisition path</h2><p>DO probe <span>→</span> Node 01 <span>→</span> MQTT <span>→</span> SQLite</p><p id="pipeline">Waiting for gateway status</p></div><div><h2>Latest sample</h2><dl><div><dt>Sequence</dt><dd id="sequence">—</dd></div><div><dt>Earlier unforwarded samples</dt><dd id="missed">—</dd></div><div><dt>Firmware</dt><dd id="firmware">—</dd></div></dl></div></section>
-<details><summary>Recent readings · accessible data table</summary><div class="table-scroll"><table><caption>Latest 20 samples, by gateway receive time</caption><thead><tr><th scope="col">Received</th><th scope="col">DO (mg/L)</th><th scope="col">Temperature (°C)</th><th scope="col">Sensor</th></tr></thead><tbody id="rows"></tbody></table></div></details>
-<footer><span>Clam factory deployment / research monitoring</span><span>Measurements require calibration and compensation verification.</span></footer>
-</main></body></html>
+<section class="trend"><div class="section-top"><div><h2 id="chart-title">Dissolved oxygen history</h2><p id="chart-caption">Gateway receive time · mg/L · gaps preserve missing readings</p></div><div class="controls"><label for="window">Window</label><select id="window"><option value="15">15 minutes</option><option value="60">1 hour</option></select><button id="pause" type="button" aria-pressed="false">Pause display</button></div></div><div class="plot"><svg id="chart" viewBox="0 0 1000 240" role="img" aria-label="Dissolved oxygen history; no data yet"></svg><p id="empty">Waiting for measurements</p></div><div class="axis"><span id="start">—</span><span>Local browser time</span><span id="end">—</span></div></section>
+<details class="diagnostics"><summary>Technical details &amp; acquisition path</summary><section class="details"><div><h2>Acquisition path</h2><p>DO probe <span>→</span> Node 01 <span>→</span> MQTT <span>→</span> SQLite</p><p id="pipeline">Waiting for gateway status</p></div><div><h2>Latest sample</h2><dl><div><dt>Sequence</dt><dd id="sequence">—</dd></div><div><dt>Earlier unforwarded samples</dt><dd id="missed">—</dd></div><div><dt>Firmware</dt><dd id="firmware">—</dd></div></dl></div></section></details>
+<details><summary>Recent readings</summary><div class="table-scroll"><table><caption>Latest 20 samples, by gateway receive time</caption><thead><tr><th scope="col">Received</th><th scope="col">DO (mg/L)</th><th scope="col">Temperature (°C)</th><th scope="col">Sensor</th></tr></thead><tbody id="rows"></tbody></table></div></details>
+</div>
+
+</main></div></body></html>
