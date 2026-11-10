@@ -5,3 +5,7 @@ topic write clam/node_01/status
 user clam_gateway
 topic read clam/+/telemetry
 topic read clam/+/status
+
+user clam_node_02
+topic write clam/node_02/telemetry
+topic write clam/node_02/status

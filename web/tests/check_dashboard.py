@@ -30,17 +30,21 @@ with tempfile.TemporaryDirectory() as folder:
                        'health': {'subscription_ready': True, 'mqtt_connected': True, 'storage_error': False},
                        'history': [{'received_at': now-5, 'sample': dict(SAMPLE, do_mg_l=6.18, temperature_c=25.32)}]}
             payload['latest'] = payload['history'][-1]
+            orp_payload = dict(payload, latest={'received_at': now-5, 'sample':dict(SAMPLE, node_id='node_02', orp_mv=-120, temperature_c=23.4)}, history=[{'received_at':now-5,'sample':dict(SAMPLE,node_id='node_02',orp_mv=-120,temperature_c=23.4)}])
+            page.route('**/api/node_02*', lambda r: r.fulfill(json=orp_payload))
             page.route('**/api/node_01*', lambda r: r.fulfill(json=payload))
             url = f'http://127.0.0.1:{server.server_port}'
             output = ROOT / 'build/dashboard'
             output.mkdir(parents=True, exist_ok=True)
             for width in [1440, 900, 390]:
-                page.set_viewport_size({'width': width, 'height': 1000})
+                page.set_viewport_size({'width': width, 'height': 768 if width > 760 else 1000})
                 page.goto(url)
                 page.wait_for_function("document.querySelector('#value-do').textContent === '6.18 mg/L'")
                 assert page.locator('#overview').is_visible()
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                if width > 760:
+                    assert page.evaluate('document.documentElement.scrollHeight <= innerHeight'), 'Overview should fit desktop height'
                 page.screenshot(path=str(output/f'overview-{width}.png'), full_page=True)
                 page.locator('#sensor-nav a[href="#temperature"]').click()
                 expect(page.locator('#live-detail')).to_be_visible()
@@ -61,11 +65,17 @@ with tempfile.TemporaryDirectory() as folder:
                 assert page.locator('#nav-indicator').evaluate('(e) => e.getAnimations().length === 0')
                 page.locator('#sensor-nav a[href="#do"]').click()
                 page.emulate_media(reduced_motion='no-preference')
+                page.locator('#sensor-nav a[href="#orp"]').click()
+                expect(page.locator('#do')).to_have_text('-120.00')
+                expect(page.locator('#temp')).to_have_text('23.40')
+                expect(page.locator('#chart title').first).to_contain_text('-120.00 mV')
+                page.locator('#sensor-nav a[href="#do"]').click()
+                expect(page.locator('#do')).to_have_text('6.18')
                 page.locator('#pause').click()
                 assert page.locator('#connection').inner_text() == 'Display paused'
                 page.locator('#pause').click()
                 page.screenshot(path=str(output/f'detail-{width}.png'), full_page=True)
-                for name in ['turbidity', 'tss', 'orp', 'ph', 'uv254', 'camera']:
+                for name in ['turbidity', 'tss', 'ph', 'uv254', 'camera']:
                     page.locator(f'#sensor-nav a[href="#{name}"]').click()
                     expect(page.locator('#planned-view')).to_be_visible()
                     assert page.locator('#live-detail').is_hidden()
@@ -79,6 +89,8 @@ with tempfile.TemporaryDirectory() as folder:
             page.reload()
             page.wait_for_function("document.querySelector('#value-do').textContent === '—'")
             page.unroute('**/api/node_01*')
+            orp_payload = dict(payload, latest={'received_at': now-5, 'sample':dict(SAMPLE, node_id='node_02', orp_mv=-120, temperature_c=23.4)}, history=[{'received_at':now-5,'sample':dict(SAMPLE,node_id='node_02',orp_mv=-120,temperature_c=23.4)}])
+            page.route('**/api/node_02*', lambda r: r.fulfill(json=orp_payload))
             page.route('**/api/node_01*', lambda r: r.fulfill(status=503, body='unavailable'))
             page.reload()
             page.wait_for_function("document.querySelector('#overview-status').textContent.includes('Gateway unavailable')")

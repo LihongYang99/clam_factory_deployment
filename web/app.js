@@ -4,12 +4,15 @@ const number = (v, digits=2) => typeof v === 'number' && Number.isFinite(v) ? v.
 const date = v => new Date(v * 1000).toLocaleString();
 let paused = false, last = null, lastFetch = 0, failed = true, busy = false;
 
+const snapshots = {}, fetchTimes = {}, fetchErrors = {};
+const nodeFor = m => m.node === 'Node 02' ? 'node_02' : 'node_01';
 const measurements = [
   {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', key:'temperature_c', unit:'°C', live:true},
+  {id:'temperature_orp', name:'Temperature · ORP probe', group:'Physical properties', node:'Node 02', key:'temperature_c', unit:'°C', live:true},
   {id:'turbidity', name:'Turbidity', group:'Physical properties', node:'Node 04', description:'No turbidity readings are available. This sensor is planned for a later commissioning step.'},
   {id:'tss', name:'Total suspended solids', group:'Physical properties', node:'Node 05', description:'The instrument and measurement principle are still to be confirmed.'},
   {id:'do', name:'Dissolved oxygen', group:'Chemical properties', node:'Node 01', key:'do_mg_l', unit:'mg/L', live:true},
-  {id:'orp', name:'Oxidation–reduction potential', group:'Chemical properties', node:'Node 02', description:'No ORP readings are available. The sensor has not been integrated with this dashboard.'},
+  {id:'orp', name:'Oxidation–reduction potential', group:'Chemical properties', node:'Node 02', key:'orp_mv', unit:'mV', live:true},
   {id:'ph', name:'pH', group:'Chemical properties', node:'Node 03', description:'No pH readings are available. The sensor has not been integrated with this dashboard.'},
   {id:'uv254', name:'UV254 / optical COD proxy', group:'Chemical properties', node:'Node 07', description:'Hardware has not been selected. Any optical COD estimate will require site-specific validation and is not a laboratory BOD result.'},
   {id:'camera', name:'RGB camera', group:'Image information', node:'Camera 06', description:'No camera is connected. Images, capture times and visual observations will appear after camera integration.'}
@@ -73,7 +76,7 @@ function selectView() {
     activeMeasurement=m; el('detail-title').textContent=m.name;
     el('chart-title').textContent=`${m.name} history`;
     el('chart-caption').textContent=`Gateway receive time · ${m.unit}`;
-    if(last) chart(last);
+    showSelectedNode();
   } else if(m) {
     el('planned-title').textContent=m.name; el('planned-description').textContent=m.description;
     el('planned-facts').replaceChildren();
@@ -84,13 +87,16 @@ function selectView() {
   }
 }
 function updateOverview() {
-  const s=last?.latest?.sample;
+  const s=snapshots.node_01?.latest?.sample;
   for(const m of measurements.filter(m=>m.live)) {
+    const node=nodeFor(m), data=snapshots[node], s=data?.latest?.sample;
+    const age=data?.latest ? data.server_time+(Date.now()-fetchTimes[node])/1000-data.latest.received_at : Infinity;
+    const state=fetchErrors[node]?'Gateway unavailable':paused?'Display paused':data?.health.storage_error?'Storage error':!data?.health.subscription_ready?'MQTT receiver disconnected':!s?'Waiting for data':age>data.stale_after_seconds?'Telemetry stale':s.sensor_status!=='OK'?`Sensor: ${s.sensor_status}`:'';
     el(`value-${m.id}`).textContent=s?.sensor_status==='OK'?`${number(s[m.key])} ${m.unit}`:'—';
-    el(`state-${m.id}`).hidden=Boolean(s?.sensor_status==='OK' && el('connection').className==='good');
-    el(`state-${m.id}`).textContent=s && s.sensor_status!=='OK'?`Sensor: ${s.sensor_status}`:el('connection').textContent;
+    el(`state-${m.id}`).hidden=!state;
+    el(`state-${m.id}`).textContent=state;
   }
-  el('overview-status').textContent=failed?'Gateway unavailable. Check the gateway connection; displayed readings may be old.':!s?'Waiting for the first reading from Node 01.':s.sensor_status!=='OK'?`Node 01 sensor reports ${s.sensor_status}. No valid current readings.`:`${el('connection').textContent}. Calibration and compensation: ${s.calibration_status} / ${s.compensation_status}.`;
+  el('overview-status').textContent='Calibration and compensation remain unverified. Each measurement shows its own connection status.';
 }
 setupNavigation();
 selectView();
@@ -117,7 +123,7 @@ function chart(data) {
   svg.setAttribute('viewBox', `0 0 ${width} 240`);
   const rows = data.history, end = data.server_time, start = end - Number(el('window').value) * 60;
   const values = rows.filter(r => r.sample.sensor_status === 'OK' && Number.isFinite(r.sample[activeMeasurement.key])).map(r => r.sample[activeMeasurement.key]);
-  const low = values.length ? Math.max(0, Math.min(...values)-0.5) : 0;
+  const low = values.length ? Math.min(...values)-0.5 : 0;
   const high = values.length ? Math.max(low+1, Math.max(...values)+0.5) : 10;
   const make = (tag, attrs) => {const n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));svg.append(n);return n;};
   for(let i=0;i<4;i++) {const y=15+i*65;make('line',{x1:55,x2:width-15,y1:y,y2:y,stroke:'#d7e1e8'});const t=make('text',{x:0,y:y+5,fill:'#526779','font-size':14});t.textContent=(high-i*(high-low)/3).toFixed(1);}
@@ -138,21 +144,40 @@ function chart(data) {
 }
 function render(data) {
   const s=data.latest?.sample;
-  for (const [id,key] of [['do','do_mg_l'],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
+  const orp=nodeFor(activeMeasurement)==='node_02';
+  document.querySelector('.primary-reading > span').textContent=orp?'Oxidation–reduction potential':'Dissolved oxygen';
+  document.querySelector('.primary-reading .unit').textContent=orp?'mV':'mg/L';
+  document.querySelector('#sat').closest('div').hidden=orp;
+  document.querySelector('thead th:nth-child(2)').textContent=orp?'ORP (mV)':'DO (mg/L)';
+  document.querySelector('.details p').textContent=`${orp?'ORP':'DO'} probe → ${activeMeasurement.node} → MQTT → SQLite`;
+  el('temperature-source').hidden=!activeMeasurement.id.startsWith('temperature');
+  el('temperature-source').textContent=`Source: ${activeMeasurement.node} · ${orp?'ORP':'DO'} probe`;
+  for (const [id,key] of [['do',orp?'orp_mv':'do_mg_l'],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
   el('received').textContent=data.latest?date(data.latest.received_at):'No samples yet';
   for (const [id,key] of [['sensor','sensor_status'],['clock','clock_status'],['calibration','calibration_status'],['compensation','compensation_status'],['sequence','sequence'],['missed','not_forwarded_before_sample'],['firmware','firmware_version']]) {el(id).textContent=s?.[key]??'—';el(id).dataset.state=s?.[key]??'UNKNOWN';}
   el('notice').textContent=!s?'Waiting for the first stored reading. No simulated data is displayed.':s.sensor_status!=='OK'?`Sensor reports ${s.sensor_status}. Invalid measurements remain missing.`:`${s.clock_status==='UNSYNCED'?'Node clock is unsynchronized. ':''}History uses gateway receive time, not sample time. Calibration: ${s.calibration_status}; compensation: ${s.compensation_status}.`;
   el('pipeline').textContent=data.health.storage_error?'SQLite write failed · recording needs attention':data.health.subscription_ready?'MQTT subscription active · readings committed to SQLite before acknowledgment':'MQTT subscription pending · showing stored history';
   chart(data);el('rows').replaceChildren();
-  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample.do_mg_l),number(r.sample.temperature_c),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
+  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[orp?'orp_mv':'do_mg_l']),number(r.sample.temperature_c),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
   freshness();
+}
+function showSelectedNode() {
+  const node=nodeFor(activeMeasurement);
+  last=snapshots[node] || {latest:null, history:[], server_time:Date.now()/1000, health:{}, stale_after_seconds:20};
+  lastFetch=fetchTimes[node] || Date.now(); failed=Boolean(fetchErrors[node]); render(last);
 }
 async function refresh() {
   if(paused||busy||document.hidden)return;
   busy=true;
-  try{const response=await fetch(`/api/node_01?minutes=${el('window').value}`,{signal:AbortSignal.timeout(5000)});if(!response.ok)throw new Error('Gateway unavailable');const data=await response.json();if(paused)return;last=data;lastFetch=Date.now();failed=false;render(data);}
-  catch{failed=true;el('connection').textContent='Gateway unavailable · retrying';el('connection').className='error';freshness();}
-  finally{busy=false;}
+  await Promise.all(['node_01','node_02'].map(async node => {
+    try {
+      const response=await fetch(`/api/${node}?minutes=${el('window').value}`,{signal:AbortSignal.timeout(5000)});
+      if(!response.ok)throw new Error('Gateway unavailable');
+      const data=await response.json(); if(paused)return;
+      snapshots[node]=data;fetchTimes[node]=Date.now();fetchErrors[node]=false;
+    } catch { if(!paused)fetchErrors[node]=true; }
+  }));
+  busy=false; if(!paused)showSelectedNode();
 }
 el('window').addEventListener('change',()=>{if(paused){paused=false;el('pause').textContent='Pause display';el('pause').setAttribute('aria-pressed','false');}refresh();});
 el('pause').addEventListener('click',()=>{paused=!paused;el('pause').textContent=paused?'Resume display':'Pause display';el('pause').setAttribute('aria-pressed',String(paused));freshness();if(!paused)refresh();});

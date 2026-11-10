@@ -55,7 +55,11 @@ def validate(topic, payload):
     for key in ('sensor_status', 'clock_status', 'calibration_status', 'compensation_status'):
         if not isinstance(data.get(key), str) or not re.fullmatch(r'[A-Z_]{1,40}', data[key]):
             raise ValueError('invalid status')
-    for key in ('do_mg_l', 'temperature_c', 'saturation_pct'):
+    fields = {'node_01': ('do_mg_l', 'temperature_c', 'saturation_pct'),
+              'node_02': ('orp_mv', 'temperature_c')}
+    if node not in fields:
+        raise ValueError('unsupported node')
+    for key in fields[node]:
         if key not in data:
             raise ValueError('missing measurement')
         value = data[key]
@@ -127,7 +131,7 @@ def handler_for(store):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlsplit(self.path)
-            if url.path == '/api/node_01':
+            if url.path in ('/api/node_01', '/api/node_02'):
                 try:
                     minutes = int(parse_qs(url.query).get('minutes', ['15'])[0])
                     if minutes not in (15, 60):
@@ -136,7 +140,7 @@ def handler_for(store):
                     self.send_error(400, 'Use minutes=15 or minutes=60')
                     return
                 try:
-                    body = json.dumps(store.snapshot('node_01', minutes), allow_nan=False).encode()
+                    body = json.dumps(store.snapshot(url.path.rsplit('/', 1)[1], minutes), allow_nan=False).encode()
                 except (sqlite3.Error, ValueError):
                     LOG.exception('Dashboard storage read failed')
                     self.send_error(503, 'Storage unavailable')

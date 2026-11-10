@@ -225,3 +225,34 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
 .sidebar #sensor-nav { position: relative; }
 #nav-indicator { position: absolute; top: 0; left: 0; width: 1px; height: 1px; background: #17344d; transform-origin: 0 0; pointer-events: none; }
 .sidebar a[aria-current] { background: #e5eef5; border-color: #8da8bb; color: #17344d; font-weight: 700; }
+
+/* Compact overview: use available width before reducing text size. */
+@media (min-width: 761px) {
+  body:has(#overview:not([hidden])) .workspace { max-width: none; grid-template-columns: 220px minmax(0, 1fr); }
+  body:has(#overview:not([hidden])) .workspace main { max-width: none; padding: clamp(16px, 2vh, 32px) 24px; }
+  body:has(#overview:not([hidden])) .intro { gap: 8px; margin-bottom: 12px; }
+  body:has(#overview:not([hidden])) h1 { font-size: clamp(24px, 2.3vw, 36px); max-width: none; }
+  .overview-heading { margin: 12px 0; }
+  #overview-heading { font-size: 24px; }
+  #overview-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .measurement-group { margin-bottom: 12px; }
+  .measurement-group h3 { padding: 8px 0; font-size: 20px; }
+  .measurement-row { padding: clamp(8px, 1.4vh, 16px) 8px; min-height: 44px; }
+  .measurement-name { font-size: 16px; }
+  .measurement-row strong { font-size: 18px; }
+  .overview-footnote { margin: 8px 0 0; }
+  body:has(#overview:not([hidden])) .sidebar { padding: 16px 12px; }
+  body:has(#overview:not([hidden])) .sidebar h2 { margin: 12px 8px 6px; }
+  body:has(#overview:not([hidden])) .sidebar a { padding: 8px 12px; margin-bottom: 4px; }
+}
+@media (min-width: 1400px) {
+  #overview-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .measurement-group:last-child { grid-column: auto; }
+}
+@media (min-width: 761px) and (max-height: 850px) {
+  body:has(#overview:not([hidden])) .sidebar { padding: 8px 12px; }
+  body:has(#overview:not([hidden])) .sidebar h2 { margin: 8px 8px 4px; font-size: 16px; }
+  body:has(#overview:not([hidden])) .sidebar a { padding: 6px 8px; margin-bottom: 2px; line-height: 1.2; }
+  #overview .notice { margin: 8px 0 12px; padding: 8px 12px; }
+  #overview .measurement-row { padding: 8px; }
+}
