@@ -356,3 +356,13 @@ Initial boot text was interrupted/partial, but subsequent JSON and status lines
 were readable. This short observation does not validate long-term serial
 integrity, sensor accuracy, network recovery, or end-to-end storage. MAC/IP
 assignments are recorded only in the ignored local commissioning notes.
+
+## LAN time synchronization
+
+Node 01 uses `192.168.88.250` (Jetson chrony) as its NTP server over UDP 123.
+The Jetson synchronizes upstream through its internet connection and allows
+clients on `192.168.88.0/24`. Check `chronyc tracking` for `Leap status: Normal`.
+Set `NTP_SERVER` in the local `arduino_secrets.h`, then compile and upload again.
+Verify telemetry reports `clock_status: SYNCED` and a non-null `sample_time_utc`.
+An unavailable time server must remain `UNSYNCED`; calibration and compensation
+are independent of clock synchronization.

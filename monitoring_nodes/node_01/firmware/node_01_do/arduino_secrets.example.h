@@ -8,4 +8,4 @@ constexpr char MQTT_HOST[] = "";
 constexpr uint16_t MQTT_PORT = 1883;
 constexpr char MQTT_USER[] = "";
 constexpr char MQTT_PASSWORD[] = "";
-constexpr char NTP_SERVER[] = "pool.ntp.org";
+constexpr char NTP_SERVER[] = "192.168.88.250";
