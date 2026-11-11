@@ -19,11 +19,14 @@ independent accuracy check. The first fresh low-standard recheck, reported at
 This comparison is not temperature-corrected and does not verify accuracy.
 A second fresh low aliquot in another clean cup after thorough rinsing instead
 settled at 11,190–11,210 µS/cm for about 95 seconds, with all responses OK and
-no setting changes. The first result was not reproduced; neither carryover nor
-another cause is established. Temperature confirmation for this replacement
-aliquot is pending before interpreting its offset or deciding on recalibration.
-A fresh high-standard recheck also remains pending. Calibration and compensation
-status remain `UNVERIFIED`.
+no setting changes. The operator confirmed this replacement aliquot was also
+approximately 22°C. The first result was not reproduced; neither carryover nor
+another cause is established. Accuracy has not been verified.
+Plan one controlled repeat of the complete dry/low/high sequence with connections
+unchanged and, if practical, both standards stabilized at their 25°C reference
+temperature. This temperature choice simplifies verification; it is not a claim
+that Atlas prohibits calibration at 22°C. Preparation and the repeat are pending.
+Calibration and compensation status remain `UNVERIFIED`.
 
 The circuit initially reported K=1 and calibration mode 0; firmware configured
 the confirmed physical K10 probe and read the setting back. Current settings
@@ -228,6 +231,14 @@ then use `CAL END` / `CAL BEGIN` and repeat the full physical procedure if neede
 `CAL STATUS` query, not another high-point write. A zero reading in wet standard
 is rejected. Readings outside Atlas's approximate ±40% pre-calibration guidance
 produce a warning; that guidance is not an accuracy tolerance.
+
+If independent standard checks disagree after the sequence, first confirm the
+actual solution temperatures and fresh, undiluted standards. For a controlled
+repeat, use `CAL END` / `CAL BEGIN` to restart the firmware sequence, then repeat
+all physical steps; do not patch only the low point. Keep electrical connections
+unchanged. If the controlled repeat still fails the standard checks, investigate
+the standards and probe/circuit measurement path rather than repeatedly rewriting
+calibration. Record discrepancies and leave accuracy unverified.
 
 ## 4. Enable MQTT and the dashboard
 
