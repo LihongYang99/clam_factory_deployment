@@ -61,3 +61,19 @@ fixture responses. Screenshots in `build/dashboard/` contain test data only.
 Temperature is source-specific: the current reading is labeled DO probe / Node 01.
 Future temperature-capable nodes must retain their own source, timestamps and
 quality flags; this view does not average them or imply one shared temperature.
+
+## Manufacturer specification shading
+
+Trend shading is a nominal manufacturer-specification band, not a confidence
+interval or verified field uncertainty. Calibration and compensation status
+remain independent. Bands break at invalid readings, sequence gaps, boot changes
+and gaps over 20 seconds, like the measurement line.
+
+- SEN0681 DO: ±3% FS on 0–20 mg/L = ±0.6 mg/L. Temperature: ±0.5°C at 25°C.
+  Source: https://wiki.dfrobot.com/sen0681/
+- SEN0709 ORP: ±5 mV specified at 25°C in 222 mV standard; temperature ±0.5°C.
+  Source: https://wiki.dfrobot.com/sen0709/
+
+The displayed ORP band is a reference to that specified condition, not a guarantee
+across the entire range or current field conditions. Planned instruments have
+no invented accuracy bands. “Not integrated” is red and retains its text label.

@@ -256,3 +256,5 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
   #overview .notice { margin: 8px 0 12px; padding: 8px 12px; }
   #overview .measurement-row { padding: 8px; }
 }
+
+.measurement-row strong.not-integrated { color: #b42318; }

@@ -6,11 +6,12 @@
 #include <esp_timer.h>
 #include <time.h>
 #include "Protocol.h"
+#include "CalibrationInput.h"
 #include "SerialLog.h"
 #include "arduino_secrets.h"
 
 constexpr char NODE_ID[] = "node_02";
-constexpr char VERSION[] = "0.1.0";
+constexpr char VERSION[] = "0.1.3";
 constexpr char TELEMETRY_TOPIC[] = "clam/node_02/telemetry";
 constexpr char STATUS_TOPIC[] = "clam/node_02/status";
 constexpr int ORP_TX = 17;
@@ -60,6 +61,8 @@ void serviceNetwork() {
     }
   }
 }
+
+extern bool calibrationMode;
 
 void sample() {
   ++sequence;
@@ -121,14 +124,90 @@ void sample() {
   }
   printLine(payload);
   // shortcut: no offline queue; add durable buffering before unattended research logging.
+  if (calibrationMode) return;
   if (!mqtt.connected() || !mqtt.publish(TELEMETRY_TOPIC, payload, false, 1))
     ++notForwarded;
+}
+
+// Calibration is local USB-only and never runs automatically on boot.
+bool calibrationMode = false;
+bool firstPointAccepted = false;
+
+void writeCalibration(uint16_t point, uint16_t mv) {
+  uint8_t frame[13];
+  sen0709::calibrationFrame(point, mv, frame);
+  while (probe.available()) probe.read();
+  probe.write(frame, sizeof(frame));
+  probe.flush();
+  uint8_t reply[32];
+  size_t count = 0;
+  bool overflow = false;
+  const uint32_t start = millis();
+  uint32_t last = start;
+  while (millis() - start < RESPONSE_MS) {
+    while (probe.available()) {
+      int b = probe.read();
+      if (count < sizeof(reply)) reply[count++] = b;
+      else overflow = true;
+      last = millis();
+    }
+    if (count && millis() - last >= 20) break;
+    delay(1);
+  }
+  const char* error = overflow ? "FRAME_OVERFLOW" : sen0709::calibrationAck(reply, count);
+  char raw[65] = "";
+  for (size_t i = 0; i < count; ++i) snprintf(raw + 2*i, 3, "%02X", reply[i]);
+  char diagnostic[256];
+  snprintf(diagnostic, sizeof(diagnostic),
+           "event=CAL_REPLY point=%u bytes=%u elapsed_ms=%lu result=%s raw_hex=%s",
+           unsigned(point), unsigned(count), (unsigned long)(millis()-start),
+           error ? error : "ACK", raw);
+  printLine(diagnostic);
+  if (error) {
+    printLine("event=CAL_WRITE_UNCONFIRMED do_not_assume_success repeat_full_procedure_if_needed");
+    firstPointAccepted = false;
+    return;
+  }
+  firstPointAccepted = point == 1;
+  printLine(point == 1 ? "event=CAL_POINT_1_ACK target_mv=200" :
+            "event=CAL_POINT_2_ACK target_mv=600 verification_required=true");
+}
+
+void serviceCalibration() {
+  static CalibrationInput input;
+  while (Serial.available()) {
+    if (!input.push(char(Serial.read()))) continue;
+    const char* command = input.text;
+    if (input.overflow) printLine("event=CAL_COMMAND_REJECTED reason=LINE_TOO_LONG");
+    else if (!input.length) { /* Ignore empty lines. */ }
+    else if (!strcmp(command, "CAL STATUS")) {
+      printLine(!calibrationMode ? "event=CAL_STATUS mode=OFF" :
+                firstPointAccepted ? "event=CAL_STATUS mode=ON point1_ack=true" :
+                "event=CAL_STATUS mode=ON point1_ack=false");
+    } else if (!strcmp(command, "CAL BEGIN")) {
+      if (!calibrationMode) firstPointAccepted = false;
+      calibrationMode = true;
+      printLine("event=CAL_MODE telemetry_paused=true serial_readings_continue=true");
+    } else if (!strcmp(command, "CAL POINT1 200 CONFIRM") ||
+               !strcmp(command, "CAL POINT2 600 CONFIRM")) {
+      const bool second = !strcmp(command, "CAL POINT2 600 CONFIRM");
+      if (!calibrationMode) printLine("event=CAL_COMMAND_REJECTED reason=MODE_OFF");
+      else if (second && !firstPointAccepted)
+        printLine("event=CAL_COMMAND_REJECTED reason=POINT1_REQUIRED");
+      else writeCalibration(second ? 2 : 1, second ? 600 : 200);
+    } else if (!strcmp(command, "CAL END")) {
+      calibrationMode = false;
+      firstPointAccepted = false;
+      printLine("event=CAL_MODE telemetry_paused=false calibration_status=UNVERIFIED");
+    } else printLine("event=CAL_COMMAND_REJECTED reason=UNKNOWN_COMMAND");
+    input.clear();
+  }
 }
 
 void setup() {
   // Node 02 uses native USB CDC; acquisition also runs without a USB host.
   Serial.begin(115200);
-  printLine("event=BOOT node=node_02 firmware=0.1.0");
+  printLine("event=BOOT node=node_02 firmware=0.1.3");
   probe.begin(4800, SERIAL_8N1, ORP_RX, ORP_TX);
   printLine("event=UART_READY");
   snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
@@ -152,6 +231,7 @@ void setup() {
 
 void loop() {
   serviceNetwork();
+  serviceCalibration();
   const uint32_t now = millis();
   if (now - lastPoll >= POLL_MS) {
     lastPoll = now;

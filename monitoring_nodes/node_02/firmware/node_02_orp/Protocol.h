@@ -21,6 +21,26 @@ inline uint16_t crc16(const uint8_t* bytes, size_t size) {
   return crc;
 }
 
+inline void calibrationFrame(uint16_t point, uint16_t mv, uint8_t (&frame)[13]) {
+  const uint8_t data[] = {1, 0x10, 1, 0x20, 0, 2, 4,
+                         0, uint8_t(point), uint8_t(mv >> 8), uint8_t(mv), 0, 0};
+  memcpy(frame, data, sizeof(data));
+  const uint16_t crc = crc16(frame, 11);
+  frame[11] = crc; frame[12] = crc >> 8;
+}
+
+inline const char* calibrationAck(const uint8_t* bytes, size_t size) {
+  if (!size) return "TIMEOUT";
+  if (size < 5) return "SHORT_FRAME";
+  if (crc16(bytes, size-2) != (bytes[size-2] | uint16_t(bytes[size-1]) << 8))
+    return "CRC_ERROR";
+  if (bytes[0] != 1) return "WRONG_ADDRESS";
+  if (size == 5 && bytes[1] == 0x90) return "MODBUS_EXCEPTION";
+  const uint8_t expected[] = {1, 0x10, 1, 0x20, 0, 2};
+  if (size != 8 || memcmp(bytes, expected, sizeof(expected))) return "UNEXPECTED_FRAME";
+  return nullptr;
+}
+
 inline int32_t signedBE(const uint8_t* bytes) {
   const uint16_t raw = (uint16_t(bytes[0]) << 8) | bytes[1];
   return raw & 0x8000 ? int32_t(raw) - 65536 : raw;

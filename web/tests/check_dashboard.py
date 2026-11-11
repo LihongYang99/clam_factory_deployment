@@ -41,6 +41,7 @@ with tempfile.TemporaryDirectory() as folder:
                 page.goto(url)
                 page.wait_for_function("document.querySelector('#value-do').textContent === '6.18 mg/L'")
                 assert page.locator('#overview').is_visible()
+                expect(page.locator('#value-ph')).to_have_css('color', 'rgb(180, 35, 24)')
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 if width > 760:
@@ -53,6 +54,8 @@ with tempfile.TemporaryDirectory() as folder:
                 assert '25.32 °C' in page.locator('#chart title').first.text_content()
                 page.locator('#sensor-nav a[href="#do"]').click()
                 expect(page.locator('#chart title').first).to_contain_text('6.18 mg/L')
+                expect(page.locator('.accuracy-bands polygon')).to_have_count(1)
+                expect(page.locator('#chart-caption')).to_contain_text('±0.6 mg/L')
                 page.wait_for_timeout(300)
                 assert page.evaluate("""() => {
                     const marker = document.querySelector('#nav-indicator').getBoundingClientRect();
@@ -93,7 +96,7 @@ with tempfile.TemporaryDirectory() as folder:
             page.route('**/api/node_02*', lambda r: r.fulfill(json=orp_payload))
             page.route('**/api/node_01*', lambda r: r.fulfill(status=503, body='unavailable'))
             page.reload()
-            page.wait_for_function("document.querySelector('#overview-status').textContent.includes('Gateway unavailable')")
+            expect(page.locator("#state-do")).to_have_text("Gateway unavailable")
             assert not errors, errors
             browser.close()
     finally:

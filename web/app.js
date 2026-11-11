@@ -6,9 +6,15 @@ let paused = false, last = null, lastFetch = 0, failed = true, busy = false;
 
 const snapshots = {}, fetchTimes = {}, fetchErrors = {};
 const nodeFor = m => m.node === 'Node 02' ? 'node_02' : 'node_01';
+const accuracy = {
+  do: {delta:0.6, note:'±0.6 mg/L; ±3% of 20 mg/L full scale'},
+  orp: {delta:5, note:'±5 mV; specified at 25°C in 222 mV standard'},
+  temperature: {delta:0.5, note:'±0.5°C; specified at 25°C'},
+  temperature_orp: {delta:0.5, note:'±0.5°C'}
+};
 const measurements = [
   {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', key:'temperature_c', unit:'°C', live:true},
-  {id:'temperature_orp', name:'Temperature · ORP probe', group:'Physical properties', node:'Node 02', key:'temperature_c', unit:'°C', live:true},
+  {id:'temperature_orp', name:'Temperature (ORP probe)', group:'Physical properties', node:'Node 02', key:'temperature_c', unit:'°C', live:true},
   {id:'turbidity', name:'Turbidity', group:'Physical properties', node:'Node 04', description:'No turbidity readings are available. This sensor is planned for a later commissioning step.'},
   {id:'tss', name:'Total suspended solids', group:'Physical properties', node:'Node 05', description:'The instrument and measurement principle are still to be confirmed.'},
   {id:'do', name:'Dissolved oxygen', group:'Chemical properties', node:'Node 01', key:'do_mg_l', unit:'mg/L', live:true},
@@ -28,8 +34,8 @@ function setupNavigation() {
     for (const m of measurements.filter(m=>m.group===group)) {
       const link=document.createElement('a'); link.href=`#${m.id}`; link.textContent=m.name; nav.append(link);
       const row=document.createElement('a'); row.href=link.href; row.className='measurement-row';
-      const label=document.createElement('span'); label.className='measurement-name'; label.textContent=m.id==='temperature'?'Temperature · DO probe':m.name;
-      const value=document.createElement('strong'); value.id=`value-${m.id}`; value.textContent=m.live?'—':'Not integrated';
+      const label=document.createElement('span'); label.className='measurement-name'; label.textContent=m.id==='temperature'?'Temperature (DO probe)':m.name;
+      const value=document.createElement('strong'); value.id=`value-${m.id}`; if(!m.live)value.className='not-integrated'; value.textContent=m.live?'—':'Not integrated';
       const state=document.createElement('span'); state.id=`state-${m.id}`; state.className='measurement-state'; state.textContent=m.live?'Waiting for data':''; state.hidden=!m.live;
       row.append(label,value,state); section.append(row);
     }
@@ -75,7 +81,7 @@ function selectView() {
   if(m?.live) {
     activeMeasurement=m; el('detail-title').textContent=m.name;
     el('chart-title').textContent=`${m.name} history`;
-    el('chart-caption').textContent=`Gateway receive time · ${m.unit}`;
+    el('chart-caption').textContent=`Gateway receive time (${m.unit})`;
     showSelectedNode();
   } else if(m) {
     el('planned-title').textContent=m.name; el('planned-description').textContent=m.description;
@@ -111,7 +117,7 @@ function freshness() {
   const stale = age !== null && age > last.stale_after_seconds;
   el('age').textContent = age === null ? 'Waiting for telemetry' : `${Math.floor(age)}s since last reception`;
   const h = last.health;
-  el('connection').textContent = failed ? 'Gateway unavailable · displayed values may be old' : paused ? 'Display paused' : h.storage_error ? 'Storage error' : !h.subscription_ready ? 'MQTT receiver disconnected or subscription pending' : stale ? 'Telemetry stale' : last.latest ? 'Receiving telemetry' : 'Waiting for telemetry';
+  el('connection').textContent = failed ? 'Gateway unavailable; displayed values may be old' : paused ? 'Display paused' : h.storage_error ? 'Storage error' : !h.subscription_ready ? 'MQTT receiver disconnected or subscription pending' : stale ? 'Telemetry stale' : last.latest ? 'Receiving telemetry' : 'Waiting for telemetry';
   el('connection').className = failed || h.storage_error || !h.subscription_ready ? 'error' : paused || stale || !last.latest ? '' : 'good';
   document.body.dataset.readingState = failed || stale || paused ? 'old' : 'current';
   updateOverview();
@@ -123,20 +129,36 @@ function chart(data) {
   svg.setAttribute('viewBox', `0 0 ${width} 240`);
   const rows = data.history, end = data.server_time, start = end - Number(el('window').value) * 60;
   const values = rows.filter(r => r.sample.sensor_status === 'OK' && Number.isFinite(r.sample[activeMeasurement.key])).map(r => r.sample[activeMeasurement.key]);
-  const low = values.length ? Math.min(...values)-0.5 : 0;
-  const high = values.length ? Math.max(low+1, Math.max(...values)+0.5) : 10;
+  const spec=accuracy[activeMeasurement.id], margin=spec?.delta || 0;
+  el('chart-caption').textContent=`Gateway receive time (${activeMeasurement.unit})${spec ? '; Shading: manufacturer spec '+spec.note+' (not verified uncertainty)' : ''}`;
+  const low = values.length ? Math.min(...values)-margin-0.5 : 0;
+  const high = values.length ? Math.max(low+1, Math.max(...values)+margin+0.5) : 10;
   const make = (tag, attrs) => {const n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));svg.append(n);return n;};
   for(let i=0;i<4;i++) {const y=15+i*65;make('line',{x1:55,x2:width-15,y1:y,y2:y,stroke:'#d7e1e8'});const t=make('text',{x:0,y:y+5,fill:'#526779','font-size':14});t.textContent=(high-i*(high-low)/3).toFixed(1);}
+  const bands=make('g',{'class':'accuracy-bands','aria-hidden':'true'});
+  let segment=[];
+  const flushBand=()=>{
+    if(!segment.length || !margin){segment=[];return;}
+    const offset=margin/(high-low)*195;
+    const polygon=document.createElementNS(svg.namespaceURI,'polygon');
+    let points=segment;
+    if(points.length===1) points=[{x:points[0].x-2.5,y:points[0].y},{x:points[0].x+2.5,y:points[0].y}];
+    polygon.setAttribute('points',[...points.map(p=>`${p.x},${p.y-offset}`),...points.slice().reverse().map(p=>`${p.x},${p.y+offset}`)].join(' '));
+    polygon.setAttribute('fill','#17657b');polygon.setAttribute('fill-opacity','0.18');bands.append(polygon);segment=[];
+  };
   let path='', previous=null;
   for (const row of rows) {
     const s=row.sample;
-    if(s.sensor_status!=='OK'||!Number.isFinite(s[activeMeasurement.key])){previous=null;continue;}
+    if(s.sensor_status!=='OK'||!Number.isFinite(s[activeMeasurement.key])){flushBand();previous=null;continue;}
     const x=55+(row.received_at-start)/(end-start)*(width-70), y=15+(high-s[activeMeasurement.key])/(high-low)*195;
     const join=previous && row.received_at-previous.received_at<=20 && s.boot_id===previous.sample.boot_id && s.sequence===previous.sample.sequence+1;
+    if(!join)flushBand();
+    segment.push({x,y});
     path+=`${join?'L':'M'}${x.toFixed(2)},${y.toFixed(2)} `;
     const dot=make('circle',{cx:x,cy:y,r:2.5,fill:'#17657b'});
     const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${date(row.received_at)}: ${number(s[activeMeasurement.key])} ${activeMeasurement.unit}`;dot.append(title);previous=row;
   }
+  flushBand();
   make('path',{d:path,fill:'none',stroke:'#17657b','stroke-width':2});
   el('empty').hidden=values.length>0;
   svg.setAttribute('aria-label',values.length?`${activeMeasurement.name}: ${values.length} valid readings. See recent readings table below.`:`No valid ${activeMeasurement.name.toLowerCase()} readings in this window`);
@@ -151,12 +173,12 @@ function render(data) {
   document.querySelector('thead th:nth-child(2)').textContent=orp?'ORP (mV)':'DO (mg/L)';
   document.querySelector('.details p').textContent=`${orp?'ORP':'DO'} probe → ${activeMeasurement.node} → MQTT → SQLite`;
   el('temperature-source').hidden=!activeMeasurement.id.startsWith('temperature');
-  el('temperature-source').textContent=`Source: ${activeMeasurement.node} · ${orp?'ORP':'DO'} probe`;
+  el('temperature-source').textContent=`Source: ${activeMeasurement.node}; ${orp?'ORP':'DO'} probe`;
   for (const [id,key] of [['do',orp?'orp_mv':'do_mg_l'],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
   el('received').textContent=data.latest?date(data.latest.received_at):'No samples yet';
   for (const [id,key] of [['sensor','sensor_status'],['clock','clock_status'],['calibration','calibration_status'],['compensation','compensation_status'],['sequence','sequence'],['missed','not_forwarded_before_sample'],['firmware','firmware_version']]) {el(id).textContent=s?.[key]??'—';el(id).dataset.state=s?.[key]??'UNKNOWN';}
   el('notice').textContent=!s?'Waiting for the first stored reading. No simulated data is displayed.':s.sensor_status!=='OK'?`Sensor reports ${s.sensor_status}. Invalid measurements remain missing.`:`${s.clock_status==='UNSYNCED'?'Node clock is unsynchronized. ':''}History uses gateway receive time, not sample time. Calibration: ${s.calibration_status}; compensation: ${s.compensation_status}.`;
-  el('pipeline').textContent=data.health.storage_error?'SQLite write failed · recording needs attention':data.health.subscription_ready?'MQTT subscription active · readings committed to SQLite before acknowledgment':'MQTT subscription pending · showing stored history';
+  el('pipeline').textContent=data.health.storage_error?'SQLite write failed; recording needs attention':data.health.subscription_ready?'MQTT subscription active; readings committed to SQLite before acknowledgment':'MQTT subscription pending; showing stored history';
   chart(data);el('rows').replaceChildren();
   for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[orp?'orp_mv':'do_mg_l']),number(r.sample.temperature_c),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
   freshness();
