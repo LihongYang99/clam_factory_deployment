@@ -8,7 +8,9 @@ One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
 | Router / WebFig | `192.168.88.1` | WebFig accessible |
 | Node 01 | `192.168.88.101` | Address and Active Address match after board reset |
 | Node 02 | `192.168.88.102` | Confirmed in serial diagnostics on 2026-11-10 |
-| Node 03–07 | `192.168.88.103`–`192.168.88.107` | Planned; slot 06 reserved for camera |
+| Node 03 / 04 | `192.168.88.103` / `192.168.88.104` | Planned |
+| Node 05 | `192.168.88.105` | Planned reservation; identified board MAC `44:1B:F6:FE:71:50` |
+| Slot 06 / Node 07 | `192.168.88.106` / `192.168.88.107` | Planned; slot 06 reserved for camera |
 | Jetson Orin Nano | `192.168.88.250` | Owner confirmed `hostname -I` includes this address |
 
 ## Reserve an address

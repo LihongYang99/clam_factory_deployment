@@ -57,8 +57,8 @@ class Tests(unittest.TestCase):
                     self.assertEqual(response.headers['Content-Type'], 'image/png')
                     image = response.read()
                     self.assertEqual(image[:8], b'\x89PNG\r\n\x1a\n')
-                    self.assertEqual(image, (ROOT/'web/logo/Bumble Bee Seafood Company Logo.png').read_bytes())
-                for path,code in [('/api/node_01?minutes=999',400),('/gateway/.env',404),('/../README.md',404),('/web/logo/Bumble%20Bee%20Seafood%20Company%20Logo.png',404)]:
+                    self.assertEqual(image, (ROOT/'web/logo-company/Bumble Bee Seafood Company Logo.png').read_bytes())
+                for path,code in [('/api/node_01?minutes=999',400),('/gateway/.env',404),('/../README.md',404),('/web/logo-company/Bumble%20Bee%20Seafood%20Company%20Logo.png',404)]:
                     with self.assertRaises(HTTPError) as error:urlopen(base+path)
                     self.assertEqual(error.exception.code,code)
             finally:server.shutdown();server.server_close();thread.join()

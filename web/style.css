@@ -259,6 +259,11 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
 }
 
 .measurement-row strong.not-integrated { color: #b42318; }
+.conductivity-instrument { grid-template-columns: 1.15fr 1.25fr; }
+@media (min-width: 651px) and (max-width: 1050px) {
+  .conductivity-instrument .quality { grid-column: auto; border-top: 0; border-left: 1px solid var(--line); }
+  .conductivity-instrument .quality dl { display: block; }
+}
 .device-ip { display: block; font-size: 14px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* One address record per board; temperature modules share their probe node. */

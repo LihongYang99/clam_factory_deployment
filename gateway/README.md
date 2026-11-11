@@ -7,6 +7,36 @@ telemetry messages (sequences 33 and 34, five seconds apart). Negative ACL and
 anonymous-access tests remain pending. The recorder, API, and dashboard are now implemented locally;
 see [dashboard setup](../docs/dashboard_setup.md) for deployment and validation.
 
+## Node 05 conductivity integration
+
+The gateway accepts schema 1 telemetry on `clam/node_05/telemetry` for the Atlas
+`EZO-EC` UART circuit. Its only required measurement is `conductivity_us_cm` in
+µS/cm: a finite, nonnegative number when `sensor_status=OK`, or `null` for sensor
+errors. Zero is a valid reading. The API at `/api/node_05?minutes=15` (or `60`)
+keeps its samples separate from Node 01 and Node 02.
+
+The circuit does not measure water temperature. Optional
+`compensation_temperature_c` records its compensation **setting**, not a probe
+reading. It is preserved in the original telemetry but must not enter the water
+temperature average. Node 05 is not yet part of the prediction-result contract.
+Code support does not establish successful hardware commissioning or calibration.
+
+After syncing the updated `gateway/` directory, create the Node 05 MQTT account
+and install the updated ACL in a Jetson terminal:
+
+```bash
+sudo mosquitto_passwd /etc/mosquitto/clam.passwd clam_node_05
+sudo chown root:mosquitto /etc/mosquitto/clam.passwd
+sudo chmod 640 /etc/mosquitto/clam.passwd
+sudo install -o root -g mosquitto -m 640 ~/clam_factory_deployment/gateway/mosquitto/clam.acl /etc/mosquitto/clam.acl
+sudo systemctl restart mosquitto clam-gateway
+```
+
+Enter the new Node 05 account password at the prompt and in that node's ignored
+firmware secrets file. Do not use `mosquitto_passwd -c`, which replaces the password
+file. The ACL permits this account to publish only its own telemetry/status;
+the gateway's existing wildcard subscription already covers Node 05.
+
 ## 1. Install on the Jetson
 
 Run in the Jetson terminal or an SSH session from the Mac:
@@ -79,7 +109,7 @@ to read. The ACL is readable by the `mosquitto` service group.
 | File or command | Purpose |
 | --- | --- |
 | `clam.conf` | Listen on the Jetson LAN address, reject anonymous clients, and load the password and ACL files |
-| `clam.acl` | Allow `clam_node_01` to publish its own telemetry/status and `clam_gateway` to read node telemetry/status |
+| `clam.acl` | Allow each of `clam_node_01`, `clam_node_02`, and `clam_node_05` to publish only its own telemetry/status; allow `clam_gateway` to read node telemetry/status |
 | `/etc/mosquitto/clam.passwd` | Previously created MQTT password hashes; neither transferred file contains these passwords |
 | `systemctl enable mosquitto` | Start the broker automatically at boot |
 | `systemctl restart mosquitto` | Restart the broker so it reads the new configuration; temporarily disconnect existing clients |

@@ -56,7 +56,8 @@ def validate(topic, payload):
         if not isinstance(data.get(key), str) or not re.fullmatch(r'[A-Z_]{1,40}', data[key]):
             raise ValueError('invalid status')
     fields = {'node_01': ('do_mg_l', 'temperature_c', 'saturation_pct'),
-              'node_02': ('orp_mv', 'temperature_c')}
+              'node_02': ('orp_mv', 'temperature_c'),
+              'node_05': ('conductivity_us_cm',)}
     if node not in fields:
         raise ValueError('unsupported node')
     for key in fields[node]:
@@ -65,10 +66,18 @@ def validate(topic, payload):
         value = data[key]
         if value is not None and (type(value) not in (int, float) or not math.isfinite(value)):
             raise ValueError('invalid measurement')
+        if key == 'conductivity_us_cm' and value is not None and value < 0:
+            raise ValueError('conductivity cannot be negative')
         if data['sensor_status'] == 'OK' and value is None:
             raise ValueError('OK requires measurements')
         if data['sensor_status'] != 'OK' and value is not None:
             raise ValueError('invalid samples must have null measurements')
+    if node == 'node_05':
+        if data.get('sensor_model') != 'EZO-EC':
+            raise ValueError('unsupported conductivity sensor')
+        setting = data.get('compensation_temperature_c')
+        if setting is not None and (type(setting) not in (int, float) or not math.isfinite(setting)):
+            raise ValueError('invalid compensation temperature setting')
     stamp = data.get('sample_time_utc')
     if stamp is not None:
         if not isinstance(stamp, str):
@@ -175,7 +184,7 @@ def handler_for(store, prediction_path=None):
             if url.path == '/api/predictions':
                 body = json.dumps(prediction_snapshot(prediction_path), allow_nan=False).encode()
                 mime = 'application/json'
-            elif url.path in ('/api/node_01', '/api/node_02'):
+            elif url.path in ('/api/node_01', '/api/node_02', '/api/node_05'):
                 try:
                     minutes = int(parse_qs(url.query).get('minutes', ['15'])[0])
                     if minutes not in (15, 60):
@@ -192,7 +201,7 @@ def handler_for(store, prediction_path=None):
                 mime = 'application/json'
             else:
                 files = {'/vt-bse-logo.png': ('gateway/images/vt-bse-logo.png', 'image/png'),
-                         '/bumble-bee-logo.png': ('web/logo/Bumble Bee Seafood Company Logo.png', 'image/png'),
+                         '/bumble-bee-logo.png': ('web/logo-company/Bumble Bee Seafood Company Logo.png', 'image/png'),
                          '/': ('web/index.html', 'text/html; charset=utf-8'), '/app.js': ('web/app.js', 'text/javascript'), '/style.css': ('web/style.css', 'text/css')}
                 if url.path not in files:
                     self.send_error(404)

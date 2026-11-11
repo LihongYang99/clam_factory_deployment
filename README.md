@@ -109,7 +109,7 @@ separate acquisition device; slot 06 is reserved without assuming an ESP32.
 | 02 / `node_02` | ORP + temperature if supported | Planned |
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
-| 05 / `node_05` | Electrical conductivity (EC) | Planned; sensor model and wiring to confirm |
+| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity (Atlas EZO-EC, K10 probe) | Firmware 0.1.0 uploaded to ESP32-S3 N16R8; live acquisition pending |
 | 06 / `camera_06` | RGB images | Reserved; interface and hardware to confirm |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 
@@ -135,7 +135,7 @@ use DHCP.
 | Node 02 | `192.168.88.102` | Confirmed in serial diagnostics (2026-11-10) |
 | Node 03 | `192.168.88.103` | Planned |
 | Node 04 | `192.168.88.104` | Planned |
-| Node 05 | `192.168.88.105` | Planned |
+| Node 05 | `192.168.88.105` | Planned; identified MAC `44:1B:F6:FE:71:50`, reservation pending |
 | Slot 06 / camera | `192.168.88.106` | Reserved in plan; camera network configuration pending |
 | Node 07 | `192.168.88.107` | Planned |
 
@@ -242,6 +242,8 @@ and add durable buffering before unattended research recording.
 - [hardware_record_tank](https://github.com/LihongYang99/hardware_record_tank):
   reference implementation, not a drop-in configuration for this site.
 - [Node 01 preparation](monitoring_nodes/node_01/README.md).
+- [Node 05 EC commissioning](monitoring_nodes/node_05/README.md): UART wiring,
+  board identification, build/upload, MQTT account, and verification.
 - [DFRobot SEN0681 protocol](https://wiki.dfrobot.com/sen0681/docs/21674):
   candidate DO sensor inherited from the earlier hardware records.
 

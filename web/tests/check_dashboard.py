@@ -35,6 +35,13 @@ with tempfile.TemporaryDirectory() as folder:
             orp_payload = dict(payload, latest={'received_at': now-5, 'sample':dict(SAMPLE, node_id='node_02', orp_mv=-120, temperature_c=23.4)}, history=[{'received_at':now-5,'sample':dict(SAMPLE,node_id='node_02',orp_mv=-120,temperature_c=23.4)}])
             page.route('**/api/node_02*', lambda r: r.fulfill(json=orp_payload))
             page.route('**/api/node_01*', lambda r: r.fulfill(json=payload))
+            ec_sample = {key:value for key,value in SAMPLE.items() if key not in ('do_mg_l', 'temperature_c', 'saturation_pct')}
+            ec_sample.update(node_id='node_05', sensor_model='EZO-EC', conductivity_us_cm=1413.5,
+                             probe_k=1.0, compensation_temperature_c=25.0)
+            ec_payload = dict(payload, history=[{'received_at':now-10, 'sample':dict(ec_sample, sequence=32, conductivity_us_cm=1410)},
+                                               {'received_at':now-5, 'sample':dict(ec_sample, sequence=33)}])
+            ec_payload['latest'] = ec_payload['history'][-1]
+            page.route('**/api/node_05*', lambda r: r.fulfill(json=ec_payload))
             prediction_payload = {'status':'waiting', 'server_time':now, 'horizon_hours':12, 'interval_hours':1, 'latest':None}
             page.route('**/api/predictions', lambda r: r.fulfill(json=prediction_payload))
             stamp = lambda value: datetime.fromtimestamp(value, timezone.utc).isoformat()
@@ -47,6 +54,7 @@ with tempfile.TemporaryDirectory() as folder:
                 page.set_viewport_size({'width': width, 'height': 768 if width > 760 else 1000})
                 page.goto(url)
                 page.wait_for_function("document.querySelector('#value-do').textContent === '6.18 mg/L'")
+                expect(page.locator('#value-conductivity')).to_have_text('1413.50 µS/cm')
                 assert page.locator('#overview').is_visible()
                 expect(page.locator('#sensor-nav a[href="#do"]')).to_have_css('font-size', '14.5px')
                 expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '16px')
@@ -77,7 +85,7 @@ with tempfile.TemporaryDirectory() as folder:
                     ('Node 02', 102, '30:30:F9:3B:81:B4', 'Configured'),
                     ('Node 03', 103, 'Not assigned', 'Planned'),
                     ('Node 04', 104, 'Not assigned', 'Planned'),
-                    ('Node 05', 105, 'Not assigned', 'Planned'),
+                    ('Node 05', 105, '44:1B:F6:FE:71:50', 'Planned'),
                     ('Camera 06', 106, 'Not assigned', 'Planned'),
                     ('Node 07', 107, 'Not assigned', 'Planned'),
                 ]:
@@ -125,7 +133,30 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#view-subtitle')).to_contain_text('192.168.88.102')
                 expect(page.locator('#chart title').first).to_contain_text('23.40 °C')
                 expect(page.locator('#sensor-nav a[href="#temperature"]')).to_have_attribute('aria-current', 'page')
+                page.locator('#sensor-nav a[href="#conductivity"]').click()
+                expect(page.locator('#detail-title')).to_have_text('Electrical conductivity')
+                expect(page.locator('.primary-reading > span').first).to_have_text('Electrical conductivity')
+                expect(page.locator('#do')).to_have_text('1413.50')
+                expect(page.locator('.primary-reading .unit')).to_have_text('µS/cm')
+                expect(page.locator('.secondary-readings')).to_be_hidden()
+                expect(page.locator('#temperature-source')).to_be_hidden()
+                expect(page.locator('#view-subtitle')).to_have_text('Node 05 / Planned IP: 192.168.88.105')
+                expect(page.locator('.details p').first).to_have_text('EC probe → Node 05 → MQTT → SQLite')
+                expect(page.locator('#chart title').last).to_contain_text('1413.50 µS/cm')
+                expect(page.locator('.accuracy-bands polygon')).to_have_count(0)
+                expect(page.locator('#chart-caption')).to_have_text('Gateway receive time (µS/cm)')
+                expect(page.locator('#live-detail thead th:not([hidden])')).to_have_text(['Received', 'EC (µS/cm)', 'Sensor'])
+                expect(page.locator('#rows tr')).to_have_count(2)
+                expect(page.locator('#rows tr').first.locator('td')).to_have_count(3)
+                expect(page.locator('#rows tr').first).not_to_contain_text('25.00')
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.evaluate('window.scrollTo(0, 0)')
+                page.mouse.move(min(width-10, 600), 10)
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(output/f'conductivity-{width}.png'), full_page=True)
                 page.locator('#sensor-nav a[href="#do"]').click()
+                expect(page.locator('.secondary-readings')).to_be_visible()
+                expect(page.locator('#live-detail thead th:not([hidden])')).to_have_text(['Received', 'DO (mg/L)', 'Temperature (°C)', 'Sensor'])
                 expect(page.locator('#chart title').first).to_contain_text('6.18 mg/L')
                 expect(page.locator('.accuracy-bands polygon')).to_have_count(1)
                 expect(page.locator('#chart-caption')).to_contain_text('±0.6 mg/L')
@@ -198,7 +229,7 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#prediction-difference-do')).to_have_text('—')
                 page.locator('#prediction-pause').click()
                 expect(page.locator('#prediction-status')).to_have_text('Latest LSTM predictions')
-                for name, suffix in [('turbidity', 104), ('conductivity', 105), ('ph', 103), ('uv254', 107), ('camera', 106)]:
+                for name, suffix in [('turbidity', 104), ('ph', 103), ('uv254', 107), ('camera', 106)]:
                     page.locator(f'#sensor-nav a[href="#{name}"]').click()
                     expect(page.locator('#planned-view')).to_be_visible()
                     expect(page.locator('#planned-facts')).to_contain_text('Planned IP')
@@ -206,6 +237,38 @@ with tempfile.TemporaryDirectory() as folder:
                     assert page.locator('#live-detail').is_hidden()
                 page.go_back()
                 expect(page.locator('#planned-title')).to_have_text('UV254 / optical COD proxy')
+
+            # EC is a separate measurement; compensation temperature is a setting only.
+            page.goto(url+'#conductivity')
+            ec_payload['server_time'] = time.time()
+            ec_payload['latest'] = {'received_at':ec_payload['server_time']-5, 'sample':dict(ec_sample, conductivity_us_cm=0)}
+            ec_payload['history'] = [ec_payload['latest']]
+            page.evaluate('refresh()')
+            expect(page.locator('#do')).to_have_text('0.00')
+            expect(page.locator('#chart title')).to_contain_text('0.00 µS/cm')
+            ec_payload['latest']['sample'].update(sensor_status='TIMEOUT', conductivity_us_cm=None)
+            page.evaluate('refresh()')
+            expect(page.locator('#do')).to_have_text('—')
+            expect(page.locator('#notice')).to_contain_text('Sensor reports TIMEOUT')
+            expect(page.locator('#empty')).to_be_visible()
+            expect(page.locator('#rows tr td').nth(1)).to_have_text('—')
+            ec_payload['latest'] = None
+            ec_payload['history'] = []
+            page.evaluate('refresh()')
+            expect(page.locator('#received')).to_have_text('No samples yet')
+            expect(page.locator('#do')).to_have_text('—')
+            ec_payload['latest'] = {'received_at':ec_payload['server_time']-30, 'sample':dict(ec_sample)}
+            ec_payload['history'] = [ec_payload['latest']]
+            page.evaluate('refresh()')
+            expect(page.locator('#connection')).to_have_text('Telemetry stale')
+            expect(page.locator('#do')).to_have_text('1413.50')
+            page.unroute('**/api/node_05*')
+            page.route('**/api/node_05*', lambda r: r.fulfill(status=503, body='unavailable'))
+            page.evaluate('refresh()')
+            expect(page.locator('#connection')).to_contain_text('Gateway unavailable')
+            expect(page.locator('#state-conductivity')).to_have_text('Gateway unavailable')
+            page.unroute('**/api/node_05*')
+            page.route('**/api/node_05*', lambda r: r.fulfill(json=ec_payload))
 
             # Temperature averages include only fresh, valid sources, never zero-fill failures.
             def reset_temperature_inputs():
@@ -310,4 +373,4 @@ with tempfile.TemporaryDirectory() as folder:
     finally:
         server.shutdown()
         server.server_close()
-print('PASS: responsive overview, IP & MAC registry/routing, temperature mean/eligibility/history/pause, sensor routing/history, prediction routing/units/states, planned devices, stale, empty, API failure.')
+print('PASS: responsive overview, EC values/units/history/error/stale/API states, IP & MAC registry/routing, temperature mean/eligibility/history/pause, sensor routing/history, prediction routing/units/states, planned devices.')

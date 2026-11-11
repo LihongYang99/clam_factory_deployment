@@ -37,6 +37,11 @@ and `web/`. Without a trained model it displays **Waiting for LSTM results**.
 The [prediction results guide](predictions.md) defines the future 12-hour output
 and hourly inference integration; no scheduled prediction job is enabled yet.
 
+Node 05 EC also requires the updated gateway for `/api/node_05`, plus its MQTT
+account and ACL. Follow [Node 05 commissioning](../monitoring_nodes/node_05/README.md)
+before expecting real conductivity readings. Its compensation-temperature setting
+is excluded from the water-temperature average.
+
 ## 2. Configure on the Jetson
 
 In the **Jetson SSH terminal**:

@@ -4,8 +4,8 @@ Standalone HTML/CSS/JavaScript, served by `gateway/app.py`. No npm install or
 frontend build step. Follow [dashboard setup](../docs/dashboard_setup.md) to
 configure the Jetson receiver and open `http://192.168.88.250:8000`.
 
-The page polls `/api/node_01`, `/api/node_02`, and `/api/predictions` every five
-seconds and shows DO, ORP, source-specific temperatures, oxygen saturation,
+The page polls `/api/node_01`, `/api/node_02`, `/api/node_05`, and `/api/predictions`
+every five seconds and shows DO, ORP, electrical conductivity, source-specific temperatures, oxygen saturation,
 sample quality, receive age, 15-minute/one-hour history, and an
 accessible table of recent samples. Pause display pauses browser polling only;
 the recorder continues collecting. No simulated values are included.
@@ -36,7 +36,7 @@ The header uses the owner-provided horizontal BSE logo at
 `gateway/images/vt-bse-logo.png`, unchanged and at its original aspect ratio.
 It is served locally through `/vt-bse-logo.png` and displayed on a light panel
 for legibility. Beside it, the owner-provided company logo is stored unchanged
-at `web/logo/Bumble Bee Seafood Company Logo.png` and served through
+at `web/logo-company/Bumble Bee Seafood Company Logo.png` and served through
 `/bumble-bee-logo.png`. Both images keep their original aspect ratios; the
 header wraps on narrow screens.
 
@@ -74,6 +74,24 @@ These are recorded LAN assignments, not live discovery or connection status.
 Maintain the `addresses` map and `setupNetwork()` device records in `web/app.js`
 when hardware or router reservations change. Probe details, temperature
 comparison and prediction sources retain their source IPs for troubleshooting.
+
+## Electrical conductivity
+
+**Electrical conductivity** opens Node 05's Atlas EZO-EC reading and history in
+µS/cm, from `conductivity_us_cm`. Zero is a valid conductivity reading. Missing
+or invalid readings remain blank; stale or disconnected readings retain their
+status. No accuracy band is shown because a verified probe specification has
+not been supplied.
+
+The EZO-EC does not measure water temperature. Its optional `probe_k` and
+`compensation_temperature_c` fields are configuration settings, not additional
+measurements. Node 05 has no temperature/saturation cards or temperature history
+column, and it does not contribute to the temperature average or prediction rows.
+Its IP assignment remains **Planned** in the address registry until the physical
+DHCP reservation is confirmed; the identified board MAC is `44:1B:F6:FE:71:50`.
+
+Deploy both the frontend and gateway when enabling Node 05, then restart
+`clam-gateway` so `/api/node_05` is available. No production readings are seeded.
 
 ## Prediction dashboard
 

@@ -24,7 +24,7 @@ const measurements = [
   {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', probe:'DO probe', key:'temperature_c', unit:'°C', live:true},
   {id:'temperature_orp', name:'Temperature (ORP probe)', group:'Physical properties', node:'Node 02', probe:'ORP probe', key:'temperature_c', unit:'°C', live:true},
   {id:'turbidity', name:'Turbidity', group:'Physical properties', node:'Node 04', description:'No turbidity readings are available. This sensor is planned for a later commissioning step.'},
-  {id:'conductivity', name:'Electrical conductivity', group:'Physical properties', node:'Node 05', description:'No conductivity readings are available. Sensor model and wiring are still to be confirmed.'},
+  {id:'conductivity', name:'Electrical conductivity', group:'Physical properties', node:'Node 05', key:'conductivity_us_cm', unit:'µS/cm', live:true},
   {id:'do', name:'Dissolved oxygen', group:'Chemical properties', node:'Node 01', key:'do_mg_l', unit:'mg/L', live:true},
   {id:'orp', name:'Oxidation–reduction potential', group:'Chemical properties', node:'Node 02', key:'orp_mv', unit:'mV', live:true},
   {id:'ph', name:'pH', group:'Chemical properties', node:'Node 03', description:'No pH readings are available. The sensor has not been integrated with this dashboard.'},
@@ -61,7 +61,7 @@ function setupNetwork() {
     {key:'Node 02', role:'ORP / Temperature', mac:'30:30:F9:3B:81:B4'},
     {key:'Node 03', role:'pH', planned:true},
     {key:'Node 04', role:'Turbidity', planned:true},
-    {key:'Node 05', role:'Electrical conductivity', planned:true},
+    {key:'Node 05', role:'Electrical conductivity', mac:'44:1B:F6:FE:71:50', planned:true},
     {key:'Camera 06', role:'RGB camera', planned:true},
     {key:'Node 07', role:'UV254 / Optical COD proxy', planned:true}
   ];
@@ -197,7 +197,7 @@ function selectView() {
   el('network-view').hidden=!network;
   el('temperature-view').hidden=!temperature;
   el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live;
-  el('view-subtitle').textContent=m ? `${m.node}${m.live ? ' / IP: '+addresses[m.node] : ''}` : '';
+  el('view-subtitle').textContent=m ? `${m.node}${m.live ? ` / ${m.id==='conductivity'?'Planned IP':'IP'}: ${addresses[m.node]}` : ''}` : '';
   el('view-subtitle').hidden=!m || temperature;
   document.querySelector('.timestamp').hidden=prediction || temperature || network;
   const navId=temperature || m?.key==='temperature_c'?'temperature':overview?'overview':id;
@@ -301,21 +301,26 @@ function chart(data) {
 }
 function render(data) {
   const s=data.latest?.sample;
-  const orp=nodeFor(activeMeasurement)==='node_02';
-  document.querySelector('.primary-reading > span').textContent=orp?'Oxidation–reduction potential':'Dissolved oxygen';
-  document.querySelector('.primary-reading .unit').textContent=orp?'mV':'mg/L';
-  document.querySelector('#sat').closest('div').hidden=orp;
-  document.querySelector('#live-detail thead th:nth-child(2)').textContent=orp?'ORP (mV)':'DO (mg/L)';
-  document.querySelector('.details p').textContent=`${orp?'ORP':'DO'} probe → ${activeMeasurement.node} → MQTT → SQLite`;
+  const primaryId={node_01:'do',node_02:'orp',node_05:'conductivity'}[nodeFor(activeMeasurement)];
+  const primary=measurements.find(m=>m.id===primaryId), ec=primaryId==='conductivity';
+  const probe=ec?'EC':primaryId.toUpperCase();
+  document.querySelector('.primary-reading > span').textContent=primary.name;
+  document.querySelector('.primary-reading .unit').textContent=primary.unit;
+  document.querySelector('.secondary-readings').hidden=ec;
+  document.querySelector('.instrument').classList.toggle('conductivity-instrument',ec);
+  document.querySelector('#sat').closest('div').hidden=primaryId!=='do';
+  document.querySelector('#live-detail thead th:nth-child(2)').textContent=`${probe} (${primary.unit})`;
+  document.querySelector('#live-detail thead th:nth-child(3)').hidden=ec;
+  document.querySelector('.details p').textContent=`${probe} probe → ${activeMeasurement.node} → MQTT → SQLite`;
   el('temperature-source').hidden=!activeMeasurement.id.startsWith('temperature');
-  el('temperature-source').textContent=`Source: ${activeMeasurement.node} / ${orp?'ORP':'DO'} probe`;
-  for (const [id,key] of [['do',orp?'orp_mv':'do_mg_l'],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
+  el('temperature-source').textContent=`Source: ${activeMeasurement.node} / ${probe} probe`;
+  for (const [id,key] of [['do',primary.key],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
   el('received').textContent=data.latest?date(data.latest.received_at):'No samples yet';
   for (const [id,key] of [['sensor','sensor_status'],['clock','clock_status'],['calibration','calibration_status'],['compensation','compensation_status'],['sequence','sequence'],['missed','not_forwarded_before_sample'],['firmware','firmware_version']]) {el(id).textContent=s?.[key]??'—';el(id).dataset.state=s?.[key]??'UNKNOWN';}
   el('notice').textContent=!s?'Waiting for the first stored reading. No simulated data is displayed.':s.sensor_status!=='OK'?`Sensor reports ${s.sensor_status}. Invalid measurements remain missing.`:`${s.clock_status==='UNSYNCED'?'Node clock is unsynchronized. ':''}History uses gateway receive time, not sample time. Calibration: ${s.calibration_status}; compensation: ${s.compensation_status}.`;
   el('pipeline').textContent=data.health.storage_error?'SQLite write failed; recording needs attention':data.health.subscription_ready?'MQTT subscription active; readings committed to SQLite before acknowledgment':'MQTT subscription pending; showing stored history';
   chart(data);el('rows').replaceChildren();
-  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[orp?'orp_mv':'do_mg_l']),number(r.sample.temperature_c),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
+  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[primary.key]),...(ec?[]:[number(r.sample.temperature_c)]),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
   freshness();
 }
 function showSelectedNode() {

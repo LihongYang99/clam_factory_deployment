@@ -9,3 +9,7 @@ topic read clam/+/status
 user clam_node_02
 topic write clam/node_02/telemetry
 topic write clam/node_02/status
+
+user clam_node_05
+topic write clam/node_05/telemetry
+topic write clam/node_05/status
