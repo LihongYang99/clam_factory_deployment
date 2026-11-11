@@ -109,11 +109,11 @@ separate acquisition device; slot 06 is reserved without assuming an ESP32.
 | 02 / `node_02` | ORP + temperature if supported | Planned |
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
-| 05 / `node_05` | TSS | Provisional; confirm instrument and measurement principle |
+| 05 / `node_05` | Electrical conductivity (EC) | Planned; sensor model and wiring to confirm |
 | 06 / `camera_06` | RGB images | Reserved; interface and hardware to confirm |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 
-EC, flow, level, and fluorescence have been discussed but are not assigned to
+Flow, level, and fluorescence have been discussed but are not assigned to
 additional nodes. Confirm additions before changing this map. A sensor's
 calculated COD or BOD output is a proxy, not a laboratory reference label.
 

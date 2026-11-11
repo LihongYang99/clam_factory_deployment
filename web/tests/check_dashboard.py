@@ -128,7 +128,7 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#prediction-difference-do')).to_have_text('—')
                 page.locator('#prediction-pause').click()
                 expect(page.locator('#prediction-status')).to_have_text('Latest LSTM predictions')
-                for name in ['turbidity', 'tss', 'ph', 'uv254', 'camera']:
+                for name in ['turbidity', 'conductivity', 'ph', 'uv254', 'camera']:
                     page.locator(f'#sensor-nav a[href="#{name}"]').click()
                     expect(page.locator('#planned-view')).to_be_visible()
                     assert page.locator('#live-detail').is_hidden()

@@ -17,7 +17,7 @@ const measurements = [
   {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', key:'temperature_c', unit:'°C', live:true},
   {id:'temperature_orp', name:'Temperature (ORP probe)', group:'Physical properties', node:'Node 02', key:'temperature_c', unit:'°C', live:true},
   {id:'turbidity', name:'Turbidity', group:'Physical properties', node:'Node 04', description:'No turbidity readings are available. This sensor is planned for a later commissioning step.'},
-  {id:'tss', name:'Total suspended solids', group:'Physical properties', node:'Node 05', description:'The instrument and measurement principle are still to be confirmed.'},
+  {id:'conductivity', name:'Electrical conductivity', group:'Physical properties', node:'Node 05', description:'No conductivity readings are available. Sensor model and wiring are still to be confirmed.'},
   {id:'do', name:'Dissolved oxygen', group:'Chemical properties', node:'Node 01', key:'do_mg_l', unit:'mg/L', live:true},
   {id:'orp', name:'Oxidation–reduction potential', group:'Chemical properties', node:'Node 02', key:'orp_mv', unit:'mV', live:true},
   {id:'ph', name:'pH', group:'Chemical properties', node:'Node 03', description:'No pH readings are available. The sensor has not been integrated with this dashboard.'},

@@ -23,7 +23,7 @@ temperature and oxygen saturation. Other devices in the README node map are
 planned; no readings, images, operating limits or verified calibration may be
 invented. Temperature and DO share Node 01.
 
-The overview groups temperature, turbidity and TSS under physical properties;
+The overview groups temperature, turbidity and electrical conductivity under physical properties;
 DO, ORP, pH and UV254 under chemical properties; RGB under image information.
 These are navigation categories approved by the owner, not a comprehensive
 scientific classification. Each measurement has a sidebar destination.
