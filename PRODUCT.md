@@ -47,4 +47,6 @@ remain unverified. No camera feed is available. See README.md for the node map.
 
 Owner-approved visual direction: white background, deep blue text, simple sans-serif
 type and a small clam outline. Temperature readings must stay identifiable by
-source sensor; only the Node 01 DO probe currently supplies temperature.
+source sensor. The temperature page compares configured probe modules and
+automatically averages current, valid readings, with a visible contributor count.
+The average is for display; source readings, history and quality remain separate.

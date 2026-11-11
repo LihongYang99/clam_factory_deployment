@@ -43,7 +43,9 @@ the gateway when adding or changing the image route.
 The overview and left navigation list Chemical properties first, followed by
 Physical properties and Image information. The left navigation opens each measurement;
 on small screens it becomes a horizontally scrollable navigation strip.
-Temperature and DO use the same Node 01 telemetry, with separate trend units.
+The Temperature navigation entry compares the temperature modules in connected
+probes. Source-specific readings and history remain available from the overview
+and each probe link.
 Other entries describe planned devices and never display invented readings or
 camera images. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
@@ -77,9 +79,32 @@ Run the isolated browser regression check from the repository root:
 The check uses installed Google Chrome, a temporary database and intercepted
 fixture responses. Screenshots in `build/dashboard/` contain test data only.
 
-Temperature is source-specific: the current reading is labeled DO probe / Node 01.
-Future temperature-capable nodes must retain their own source, timestamps and
-quality flags; this view does not average them or imply one shared temperature.
+## Temperature comparison and average
+
+Open **Temperature** to see each probe's latest temperature and an arithmetic
+mean. DO / Node 01 and ORP / Node 02 are currently configured. All configured
+temperature modules participate automatically; no location or manual grouping
+is required. The page shows how many probes contribute and why others do not.
+
+The mean includes only finite temperature values from successful API responses,
+with a connected MQTT receiver, ready subscription, healthy storage,
+`sensor_status=OK`, and a gateway receive age within that node's freshness limit
+(currently 20 seconds). Null, invalid, stale and disconnected sources are
+excluded. Zero degrees is a valid value. One contributor is explicitly labeled
+as a single-probe reading; no contributors shows a dash rather than zero.
+
+This is a display average of the latest eligible readings, not simultaneous
+sampling or a calibration correction. It does not overwrite individual readings,
+SQLite history, or source-specific temperature predictions, and it does not
+improve or certify probe accuracy. Each row keeps its source and receive time.
+Pause display freezes the displayed readings and mean until resumed.
+
+`#temperature` opens the comparison; `#temperature_do` and `#temperature_orp`
+open the existing individual histories. When integrating another temperature
+module, add a live measurement with `key: 'temperature_c'`, a unique ID, the
+`Node NN` source and `probe` label in `web/app.js`, and implement its gateway API
+as part of node integration. It then joins the comparison and average
+automatically; unintegrated nodes are not included.
 
 ## Manufacturer specification shading
 

@@ -3,6 +3,7 @@ Run from the repository root: .venv/bin/python web/tests/check_dashboard.py
 All telemetry is intercepted test data; no deployment database is opened.
 """
 import sys
+import re
 import tempfile
 import threading
 import time
@@ -56,11 +57,29 @@ with tempfile.TemporaryDirectory() as folder:
                     assert page.evaluate('document.documentElement.scrollHeight <= innerHeight'), 'Overview should fit desktop height'
                 page.screenshot(path=str(output/f'overview-{width}.png'), full_page=True)
                 page.locator('#sensor-nav a[href="#temperature"]').click()
+                expect(page.locator('#temperature-view')).to_be_visible()
+                expect(page.locator('#temperature-average')).to_have_text('24.36')
+                expect(page.locator('#temperature-count')).to_have_text('2 of 2 probes')
+                expect(page.locator('#reading-temperature')).to_contain_text('25.32')
+                expect(page.locator('#reading-temperature_orp')).to_contain_text('23.40')
+                expect(page.locator('#sensor-nav a[href="#temperature_orp"]')).to_have_count(0)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.evaluate('window.scrollTo(0, 0)')
+                page.mouse.move(min(width-10, 600), 10)
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(output/f'temperatures-{width}.png'), full_page=True)
+                page.locator('#temperature-view a[href="#temperature_do"]').click()
                 expect(page.locator('#live-detail')).to_be_visible()
                 expect(page.locator('#chart-title')).to_have_text('Temperature history')
                 expect(page.locator('#temperature-source')).to_be_visible()
                 expect(page.locator('#temperature-source')).to_have_text('Source: Node 01 / DO probe')
+                expect(page.locator('#sensor-nav a[href="#temperature"]')).to_have_attribute('aria-current', 'page')
                 assert '25.32 °C' in page.locator('#chart title').first.text_content()
+                page.locator('#sensor-nav a[href="#temperature"]').click()
+                page.locator('#temperature-view a[href="#temperature_orp"]').click()
+                expect(page.locator('#temperature-source')).to_have_text('Source: Node 02 / ORP probe')
+                expect(page.locator('#chart title').first).to_contain_text('23.40 °C')
+                expect(page.locator('#sensor-nav a[href="#temperature"]')).to_have_attribute('aria-current', 'page')
                 page.locator('#sensor-nav a[href="#do"]').click()
                 expect(page.locator('#chart title').first).to_contain_text('6.18 mg/L')
                 expect(page.locator('.accuracy-bands polygon')).to_have_count(1)
@@ -119,6 +138,9 @@ with tempfile.TemporaryDirectory() as folder:
                 page.evaluate('window.scrollTo(0, 0)')
                 page.wait_for_timeout(300)
                 page.screenshot(path=str(output/f'predictions-ready-{width}.png'), full_page=True)
+                page.locator('#prediction-rows a[href="#temperature_do"]').click()
+                expect(page.locator('#temperature-source')).to_have_text('Source: Node 01 / DO probe')
+                page.go_back()
                 page.locator('#prediction-rows a[href="#temperature_orp"]').click()
                 expect(page.locator('#temperature-source')).to_have_text('Source: Node 02 / ORP probe')
                 page.go_back()
@@ -134,6 +156,73 @@ with tempfile.TemporaryDirectory() as folder:
                     assert page.locator('#live-detail').is_hidden()
                 page.go_back()
                 expect(page.locator('#planned-title')).to_have_text('UV254 / optical COD proxy')
+
+            # Temperature averages include only fresh, valid sources, never zero-fill failures.
+            def reset_temperature_inputs():
+                current = time.time()
+                for node, data, temperature in [('node_01', payload, 25.32), ('node_02', orp_payload, 23.4)]:
+                    data['server_time'] = current
+                    data['health'] = {'subscription_ready': True, 'mqtt_connected': True, 'storage_error': False}
+                    data['latest'] = {'received_at': current-5, 'sample':dict(SAMPLE, node_id=node, temperature_c=temperature, orp_mv=-120)}
+                    data['history'] = [data['latest']]
+
+            reset_temperature_inputs()
+            page.goto(url+'#temperature')
+            expect(page.locator('#temperature-average')).to_have_text('24.36')
+            payload['latest']['sample']['temperature_c'] = 0
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('11.70')
+            expect(page.locator('#temperature-count')).to_have_text('2 of 2 probes')
+
+            for invalidity in ['null', 'sensor', 'stale', 'future', 'subscription', 'mqtt', 'storage']:
+                reset_temperature_inputs()
+                if invalidity == 'null': payload['latest']['sample']['temperature_c'] = None
+                if invalidity == 'sensor': payload['latest']['sample']['sensor_status'] = 'TIMEOUT'
+                if invalidity == 'stale': payload['latest']['received_at'] = payload['server_time']-21
+                if invalidity == 'future': payload['latest']['received_at'] = payload['server_time']+30
+                if invalidity == 'subscription': payload['health']['subscription_ready'] = False
+                if invalidity == 'mqtt': payload['health']['mqtt_connected'] = False
+                if invalidity == 'storage': payload['health']['storage_error'] = True
+                page.evaluate('refresh()')
+                expect(page.locator('#temperature-average')).to_have_text('23.40')
+                expect(page.locator('#temperature-count')).to_have_text('1 of 2 probes')
+                expect(page.locator('#temperature-average-state')).to_contain_text(re.compile('one valid probe only', re.I))
+                assert page.locator('#reading-state-temperature').inner_text().strip(), invalidity
+
+            reset_temperature_inputs()
+            orp_payload['latest']['sample']['temperature_c'] = None
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('25.32')
+            expect(page.locator('#temperature-count')).to_have_text('1 of 2 probes')
+            payload['latest']['sample']['temperature_c'] = None
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('—')
+            expect(page.locator('#temperature-count')).to_have_text('0 of 2 probes')
+
+            reset_temperature_inputs()
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('24.36')
+            page.locator('#temperature-pause').click()
+            expect(page.locator('#temperature-average-state')).to_contain_text('Display paused')
+            payload['latest']['sample']['temperature_c'] = 10
+            orp_payload['latest']['sample']['temperature_c'] = 20
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('24.36')
+            expect(page.locator('#reading-temperature')).to_contain_text('25.32')
+            page.locator('#temperature-pause').click()
+            expect(page.locator('#temperature-average')).to_have_text('15.00')
+
+            reset_temperature_inputs()
+            page.unroute('**/api/node_01*')
+            page.route('**/api/node_01*', lambda r: r.fulfill(status=503, body='unavailable'))
+            page.evaluate('refresh()')
+            expect(page.locator('#temperature-average')).to_have_text('23.40')
+            expect(page.locator('#temperature-count')).to_have_text('1 of 2 probes')
+            expect(page.locator('#reading-state-temperature')).to_contain_text('Gateway unavailable')
+            page.unroute('**/api/node_01*')
+            page.route('**/api/node_01*', lambda r: r.fulfill(json=payload))
+            reset_temperature_inputs()
+
             payload['server_time'] = now+100
             page.goto(url)
             page.wait_for_function("document.querySelector('#state-do').textContent === 'Telemetry stale'")
@@ -171,4 +260,4 @@ with tempfile.TemporaryDirectory() as folder:
     finally:
         server.shutdown()
         server.server_close()
-print('PASS: responsive overview, sensor routing/history, prediction routing/units/states, planned devices, pause, stale, empty, API failure.')
+print('PASS: responsive overview, temperature mean/eligibility/history/pause, sensor routing/history, prediction routing/units/states, planned devices, stale, empty, API failure.')

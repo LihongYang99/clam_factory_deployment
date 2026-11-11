@@ -2,11 +2,11 @@
 const el = id => document.getElementById(id);
 const number = (v, digits=2) => typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—';
 const date = v => new Date(v * 1000).toLocaleString();
-let paused = false, last = null, lastFetch = 0, failed = true, busy = false;
+let paused = false, pausedAt = 0, last = null, lastFetch = 0, failed = true, busy = false;
 
 const snapshots = {}, fetchTimes = {}, fetchErrors = {};
 let predictionData = null, predictionFetchTime = 0, predictionFailed = false;
-const nodeFor = m => m.node === 'Node 02' ? 'node_02' : 'node_01';
+const nodeFor = m => m.node.toLowerCase().replace(' ', '_');
 const accuracy = {
   do: {delta:0.6, note:'±0.6 mg/L; ±3% of 20 mg/L full scale'},
   orp: {delta:5, note:'±5 mV; specified at 25°C in 222 mV standard'},
@@ -14,8 +14,8 @@ const accuracy = {
   temperature_orp: {delta:0.5, note:'±0.5°C'}
 };
 const measurements = [
-  {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', key:'temperature_c', unit:'°C', live:true},
-  {id:'temperature_orp', name:'Temperature (ORP probe)', group:'Physical properties', node:'Node 02', key:'temperature_c', unit:'°C', live:true},
+  {id:'temperature', name:'Temperature', group:'Physical properties', node:'Node 01', probe:'DO probe', key:'temperature_c', unit:'°C', live:true},
+  {id:'temperature_orp', name:'Temperature (ORP probe)', group:'Physical properties', node:'Node 02', probe:'ORP probe', key:'temperature_c', unit:'°C', live:true},
   {id:'turbidity', name:'Turbidity', group:'Physical properties', node:'Node 04', description:'No turbidity readings are available. This sensor is planned for a later commissioning step.'},
   {id:'conductivity', name:'Electrical conductivity', group:'Physical properties', node:'Node 05', description:'No conductivity readings are available. Sensor model and wiring are still to be confirmed.'},
   {id:'do', name:'Dissolved oxygen', group:'Chemical properties', node:'Node 01', key:'do_mg_l', unit:'mg/L', live:true},
@@ -24,6 +24,8 @@ const measurements = [
   {id:'uv254', name:'UV254 / optical COD proxy', group:'Chemical properties', node:'Node 07', description:'Hardware has not been selected. Any optical COD estimate will require site-specific validation and is not a laboratory BOD result.'},
   {id:'camera', name:'RGB camera', group:'Image information', node:'Camera 06', description:'No camera is connected. Images, capture times and visual observations will appear after camera integration.'}
 ];
+const temperatureMeasurements = measurements.filter(m => m.live && m.key === 'temperature_c');
+const detailHref = m => m.id === 'temperature' ? '#temperature_do' : `#${m.id}`;
 let activeMeasurement = measurements.find(m => m.id === 'do');
 function setupNavigation() {
   const nav = el('sensor-nav');
@@ -33,8 +35,9 @@ function setupNavigation() {
     const section=document.createElement('section'); section.className='measurement-group';
     const title=document.createElement('h3'); title.textContent=group; section.append(title);
     for (const m of measurements.filter(m=>m.group===group)) {
-      const link=document.createElement('a'); link.href=`#${m.id}`; link.textContent=m.name; nav.append(link);
-      const row=document.createElement('a'); row.href=link.href; row.className='measurement-row';
+      const link=document.createElement('a'); link.href=`#${m.id}`; link.textContent=m.name;
+      if(m.key!=='temperature_c' || m===temperatureMeasurements[0]) nav.append(link);
+      const row=document.createElement('a'); row.href=detailHref(m); row.className='measurement-row';
       const label=document.createElement('span'); label.className='measurement-name'; label.textContent=m.id==='temperature'?'Temperature (DO probe)':m.name;
       const value=document.createElement('strong'); value.id=`value-${m.id}`; if(!m.live)value.className='not-integrated'; value.textContent=m.live?'—':'Not integrated';
       const state=document.createElement('span'); state.id=`state-${m.id}`; state.className='measurement-state'; state.textContent=m.live?'Waiting for data':''; state.hidden=!m.live;
@@ -43,12 +46,56 @@ function setupNavigation() {
     el('overview-groups').append(section);
   }
 }
+function setupTemperatures() {
+  for (const m of temperatureMeasurements) {
+    const row = document.createElement('tr'); row.id = `temperature-row-${m.id}`;
+    const name = document.createElement('th'); name.scope = 'row';
+    const link = document.createElement('a'); link.href = detailHref(m);
+    link.textContent = `${m.probe} / ${m.node}`;
+    name.append(link); row.append(name);
+    for (const [prefix, label] of [['reading', 'Temperature'], ['reading-time', 'Last received'], ['reading-state', 'Average participation']]) {
+      const cell = document.createElement('td'); cell.id = `${prefix}-${m.id}`; cell.dataset.label = label;
+      cell.textContent = '—'; row.append(cell);
+    }
+    el('temperature-rows').append(row);
+  }
+}
+function renderTemperatures() {
+  const now = paused ? pausedAt : Date.now();
+  const readings = temperatureMeasurements.map(m => {
+    const node = nodeFor(m), data = snapshots[node], latest = data?.latest, sample = latest?.sample;
+    const value = sample?.[m.key];
+    const age = data?.server_time + (now - fetchTimes[node]) / 1000 - latest?.received_at;
+    const state = fetchErrors[node] ? 'Gateway unavailable' : !sample ? 'Waiting for data'
+      : data.health?.storage_error ? 'Storage error'
+      : !data.health?.mqtt_connected || !data.health?.subscription_ready ? 'Receiver disconnected'
+      : sample.sensor_status !== 'OK' ? `Sensor: ${sample.sensor_status}`
+      : !Number.isFinite(value) ? 'No temperature reading'
+      : !Number.isFinite(age) || age < 0 || !(age <= data.stale_after_seconds) ? 'Stale reading' : '';
+    el(`reading-${m.id}`).textContent = sample?.sensor_status === 'OK' && Number.isFinite(value) ? `${number(value)} °C` : '—';
+    el(`reading-time-${m.id}`).textContent = Number.isFinite(latest?.received_at) ? date(latest.received_at) : '—';
+    el(`reading-state-${m.id}`).textContent = state || 'Included';
+    el(`temperature-row-${m.id}`).classList.toggle('is-excluded', Boolean(state));
+    return {value, valid: !state};
+  });
+  const valid = readings.filter(r => r.valid);
+  el('temperature-average').textContent = valid.length ? number(valid.reduce((sum, r) => sum + r.value, 0) / valid.length) : '—';
+  el('temperature-count').textContent = `${valid.length} of ${readings.length} probes`;
+  el('temperature-average-state').textContent = paused ? 'Display paused / Last displayed readings'
+    : !valid.length ? 'No valid temperature readings. Check the probe status below.'
+    : valid.length === 1 ? 'One valid probe only. This is its reading, not a multi-probe average.'
+    : 'Mean of current probe readings.';
+  el('temperature-view').dataset.state = paused ? 'paused' : valid.length ? 'ready' : 'unavailable';
+  el('connection').textContent = paused ? 'Display paused' : valid.length === readings.length ? 'Receiving temperature readings'
+    : valid.length ? 'Some temperature readings unavailable' : 'No current temperature readings';
+  el('connection').className = paused ? '' : valid.length === readings.length ? 'good' : valid.length ? '' : 'error';
+}
 const predictionMeasurements = ['do', 'orp', 'temperature', 'temperature_orp'].map(id => measurements.find(m => m.id === id));
 function setupPredictions() {
   for (const m of predictionMeasurements) {
     const row = document.createElement('tr'), name = document.createElement('th');
     name.scope = 'row';
-    const link = document.createElement('a'); link.href = `#${m.id}`;
+    const link = document.createElement('a'); link.href = detailHref(m);
     link.textContent = m.id === 'orp' ? 'ORP' : m.id === 'temperature' ? 'Temperature (DO probe)' : m.name;
     const source = document.createElement('span'); source.className = 'prediction-source'; source.textContent = m.node;
     name.append(link, source); row.append(name);
@@ -113,18 +160,21 @@ function positionNavIndicator(animate = false) {
 }
 function selectView() {
   const id=location.hash.slice(1) || 'overview';
-  const m=measurements.find(m=>m.id===id);
-  const prediction=id==='predictions', overview=!m && !prediction;
+  const m=measurements.find(m=>m.id===(id==='temperature_do'?'temperature':id));
+  const temperature=id==='temperature', prediction=id==='predictions', overview=!m && !prediction && !temperature;
   el('overview').hidden=!overview; el('prediction-view').hidden=!prediction;
-  el('live-detail').hidden=!m?.live; el('planned-view').hidden=!m || m.live;
+  el('temperature-view').hidden=!temperature;
+  el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live;
   el('view-subtitle').textContent=m?.node || '';
-  el('view-subtitle').hidden=!m;
-  document.querySelector('.timestamp').hidden=prediction;
+  el('view-subtitle').hidden=!m || temperature;
+  document.querySelector('.timestamp').hidden=prediction || temperature;
+  const navId=temperature || m?.key==='temperature_c'?'temperature':overview?'overview':id;
   for(const a of el('sensor-nav').querySelectorAll('a')) {
-    if(a.hash===`#${overview?'overview':id}`) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
+    if(a.hash===`#${navId}`) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   }
   positionNavIndicator(true);
   if(prediction) renderPredictions();
+  if(temperature) {renderTemperatures();return;}
   el('temperature-source').hidden=id!=='temperature';
   if(m?.live) {
     activeMeasurement=m; el('detail-title').textContent=m.name;
@@ -153,6 +203,7 @@ function updateOverview() {
   el('overview-status').textContent='Calibration and compensation remain unverified. Each measurement shows its own connection status.';
 }
 setupNavigation();
+setupTemperatures();
 setupPredictions();
 selectView();
 new ResizeObserver(() => positionNavIndicator()).observe(el('sensor-nav'));
@@ -161,7 +212,7 @@ window.addEventListener('hashchange',()=>{selectView();el('main').focus();});
 
 function freshness() {
   if(!el('prediction-view').hidden) renderPredictions();
-  if (!last) { updateOverview(); return; }
+  if (!last) { updateOverview(); if(!el('temperature-view').hidden)renderTemperatures(); return; }
   const elapsed = (Date.now() - lastFetch) / 1000;
   const age = last.latest ? Math.max(0, last.server_time + elapsed - last.latest.received_at) : null;
   const stale = age !== null && age > last.stale_after_seconds;
@@ -172,6 +223,7 @@ function freshness() {
   document.body.dataset.readingState = failed || stale || paused ? 'old' : 'current';
   updateOverview();
   el('sample-state').textContent = last.latest ? (failed || stale || paused ? 'Last stored reading' : 'Latest received reading') : 'No sample';
+  if(!el('temperature-view').hidden)renderTemperatures();
 }
 function chart(data) {
   const svg = el('chart'); svg.replaceChildren();
@@ -241,7 +293,7 @@ function showSelectedNode() {
 async function refresh() {
   if(paused||busy||document.hidden)return;
   busy=true;
-  const nodeRequests=['node_01','node_02'].map(async node => {
+  const nodeRequests=[...new Set(measurements.filter(m=>m.live).map(nodeFor))].map(async node => {
     try {
       const response=await fetch(`/api/${node}?minutes=${el('window').value}`,{signal:AbortSignal.timeout(5000)});
       if(!response.ok)throw new Error('Gateway unavailable');
@@ -264,12 +316,13 @@ async function refreshPredictions() {
   } catch { if(!paused)predictionFailed=true; }
 }
 function setPaused(value) {
+  if(value && !paused)pausedAt=Date.now();
   paused=value;
-  for(const id of ['pause','prediction-pause']) {el(id).textContent=paused?'Resume display':'Pause display';el(id).setAttribute('aria-pressed',String(paused));}
+  for(const id of ['pause','prediction-pause','temperature-pause']) {el(id).textContent=paused?'Resume display':'Pause display';el(id).setAttribute('aria-pressed',String(paused));}
   freshness();if(!paused)refresh();
 }
 el('window').addEventListener('change',()=>setPaused(false));
-for(const id of ['pause','prediction-pause']) el(id).addEventListener('click',()=>setPaused(!paused));
+for(const id of ['pause','prediction-pause','temperature-pause']) el(id).addEventListener('click',()=>setPaused(!paused));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(refresh,5000);setInterval(freshness,1000);refresh();
 
