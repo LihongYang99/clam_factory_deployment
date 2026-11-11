@@ -5,6 +5,7 @@ const date = v => new Date(v * 1000).toLocaleString();
 let paused = false, last = null, lastFetch = 0, failed = true, busy = false;
 
 const snapshots = {}, fetchTimes = {}, fetchErrors = {};
+let predictionData = null, predictionFetchTime = 0, predictionFailed = false;
 const nodeFor = m => m.node === 'Node 02' ? 'node_02' : 'node_01';
 const accuracy = {
   do: {delta:0.6, note:'±0.6 mg/L; ±3% of 20 mg/L full scale'},
@@ -26,7 +27,7 @@ const measurements = [
 let activeMeasurement = measurements.find(m => m.id === 'do');
 function setupNavigation() {
   const nav = el('sensor-nav');
-  nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a>';
+  nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a><a href="#predictions" class="nav-overview">Prediction dashboard</a>';
   for (const group of ['Chemical properties','Physical properties','Image information']) {
     const heading = document.createElement('h2'); heading.textContent=group; nav.append(heading);
     const section=document.createElement('section'); section.className='measurement-group';
@@ -40,6 +41,50 @@ function setupNavigation() {
       row.append(label,value,state); section.append(row);
     }
     el('overview-groups').append(section);
+  }
+}
+const predictionMeasurements = ['do', 'orp', 'temperature', 'temperature_orp'].map(id => measurements.find(m => m.id === id));
+function setupPredictions() {
+  for (const m of predictionMeasurements) {
+    const row = document.createElement('tr'), name = document.createElement('th');
+    name.scope = 'row';
+    const link = document.createElement('a'); link.href = `#${m.id}`;
+    link.textContent = m.id === 'orp' ? 'ORP' : m.id === 'temperature' ? 'Temperature (DO probe)' : m.name;
+    const source = document.createElement('span'); source.className = 'prediction-source'; source.textContent = m.node;
+    name.append(link, source); row.append(name);
+    for (const field of ['current', 'forecast', 'difference']) {
+      const cell = document.createElement('td'); cell.dataset.label = {current:'Latest reading', forecast:'12h forecast', difference:'Difference'}[field];
+      const value = document.createElement('strong'); value.id = `prediction-${field}-${m.id}`; value.textContent = '—'; cell.append(value);
+      if (field === 'current') { const state = document.createElement('span'); state.id = `prediction-source-state-${m.id}`; state.className = 'prediction-source'; cell.append(state); }
+      row.append(cell);
+    }
+    el('prediction-rows').append(row);
+  }
+}
+function renderPredictions() {
+  const latest = predictionData?.latest;
+  const now = predictionData ? predictionData.server_time + (Date.now() - predictionFetchTime) / 1000 : Date.now() / 1000;
+  const generated = latest ? Date.parse(latest.generated_at) / 1000 : null;
+  const stale = latest && (now - generated > 90 * 60 || predictionData.status === 'stale');
+  const state = predictionFailed || predictionData?.status === 'error' ? 'error' : paused ? 'paused' : stale ? 'stale' : predictionData?.status || 'loading';
+  const messages = {loading:'Loading prediction results…', waiting:'Waiting for LSTM results', ready:'Latest LSTM predictions', stale:'Update overdue / Showing the last prediction', paused:'Display paused / Predictions are not refreshing', error:latest?'Prediction service unavailable / Displayed forecasts may be old':'Prediction data unavailable / Check the gateway'};
+  el('prediction-status').textContent = messages[state];
+  el('prediction-view').dataset.state = state;
+  el('prediction-generated').textContent = latest ? date(generated) : '—';
+  el('prediction-target').textContent = latest ? new Date(latest.forecast_for).toLocaleString() : '—';
+  el('prediction-model').textContent = latest ? `Model: ${latest.model_version} / Times shown in local browser time` : state === 'waiting' ? 'No LSTM results have been received. Hourly inference is not configured yet.' : '';
+  for (const m of predictionMeasurements) {
+    const node = nodeFor(m), data = snapshots[node], sample = data?.latest?.sample;
+    const age = data?.latest ? data.server_time + (Date.now() - fetchTimes[node]) / 1000 - data.latest.received_at : Infinity;
+    const sourceState = fetchErrors[node] ? 'Gateway unavailable' : paused ? 'Display paused' : data?.health.storage_error ? 'Storage error' : !data?.health.subscription_ready ? 'Receiver disconnected' : !sample ? 'Waiting for data' : sample.sensor_status !== 'OK' ? `Sensor: ${sample.sensor_status}` : age > data.stale_after_seconds ? 'Stale reading' : '';
+    const current = sample?.sensor_status === 'OK' ? sample[m.key] : null;
+    const forecast = latest?.values[m.id];
+    const format = value => Number.isFinite(value) ? `${number(value)} ${m.unit}` : '—';
+    el(`prediction-current-${m.id}`).textContent = format(current);
+    el(`prediction-source-state-${m.id}`).textContent = sourceState;
+    el(`prediction-forecast-${m.id}`).textContent = format(forecast);
+    const difference = forecast - current;
+    el(`prediction-difference-${m.id}`).textContent = state === 'ready' && !sourceState && Number.isFinite(current) && Number.isFinite(forecast) ? `${difference > 0 ? '+' : ''}${number(difference)} ${m.unit}` : '—';
   }
 }
 // Motion Prompt #057 · MIT License (c) 2026 Shohei Ohtaki · https://showheyohtaki.github.io/motion-prompt/#057
@@ -69,14 +114,17 @@ function positionNavIndicator(animate = false) {
 function selectView() {
   const id=location.hash.slice(1) || 'overview';
   const m=measurements.find(m=>m.id===id);
-  const overview=!m;
-  el('overview').hidden=!overview; el('live-detail').hidden=overview || !m.live; el('planned-view').hidden=overview || m.live;
-  el('view-subtitle').textContent=overview?'':`${m.node}`;
-  el('view-subtitle').hidden=overview;
+  const prediction=id==='predictions', overview=!m && !prediction;
+  el('overview').hidden=!overview; el('prediction-view').hidden=!prediction;
+  el('live-detail').hidden=!m?.live; el('planned-view').hidden=!m || m.live;
+  el('view-subtitle').textContent=m?.node || '';
+  el('view-subtitle').hidden=!m;
+  document.querySelector('.timestamp').hidden=prediction;
   for(const a of el('sensor-nav').querySelectorAll('a')) {
     if(a.hash===`#${overview?'overview':id}`) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   }
   positionNavIndicator(true);
+  if(prediction) renderPredictions();
   el('temperature-source').hidden=id!=='temperature';
   if(m?.live) {
     activeMeasurement=m; el('detail-title').textContent=m.name;
@@ -105,12 +153,14 @@ function updateOverview() {
   el('overview-status').textContent='Calibration and compensation remain unverified. Each measurement shows its own connection status.';
 }
 setupNavigation();
+setupPredictions();
 selectView();
 new ResizeObserver(() => positionNavIndicator()).observe(el('sensor-nav'));
 document.fonts.ready.then(() => positionNavIndicator());
 window.addEventListener('hashchange',()=>{selectView();el('main').focus();});
 
 function freshness() {
+  if(!el('prediction-view').hidden) renderPredictions();
   if (!last) { updateOverview(); return; }
   const elapsed = (Date.now() - lastFetch) / 1000;
   const age = last.latest ? Math.max(0, last.server_time + elapsed - last.latest.received_at) : null;
@@ -170,10 +220,10 @@ function render(data) {
   document.querySelector('.primary-reading > span').textContent=orp?'Oxidation–reduction potential':'Dissolved oxygen';
   document.querySelector('.primary-reading .unit').textContent=orp?'mV':'mg/L';
   document.querySelector('#sat').closest('div').hidden=orp;
-  document.querySelector('thead th:nth-child(2)').textContent=orp?'ORP (mV)':'DO (mg/L)';
+  document.querySelector('#live-detail thead th:nth-child(2)').textContent=orp?'ORP (mV)':'DO (mg/L)';
   document.querySelector('.details p').textContent=`${orp?'ORP':'DO'} probe → ${activeMeasurement.node} → MQTT → SQLite`;
   el('temperature-source').hidden=!activeMeasurement.id.startsWith('temperature');
-  el('temperature-source').textContent=`Source: ${activeMeasurement.node}; ${orp?'ORP':'DO'} probe`;
+  el('temperature-source').textContent=`Source: ${activeMeasurement.node} / ${orp?'ORP':'DO'} probe`;
   for (const [id,key] of [['do',orp?'orp_mv':'do_mg_l'],['temp','temperature_c'],['sat','saturation_pct']]) el(id).textContent=number(s?.[key]);
   el('received').textContent=data.latest?date(data.latest.received_at):'No samples yet';
   for (const [id,key] of [['sensor','sensor_status'],['clock','clock_status'],['calibration','calibration_status'],['compensation','compensation_status'],['sequence','sequence'],['missed','not_forwarded_before_sample'],['firmware','firmware_version']]) {el(id).textContent=s?.[key]??'—';el(id).dataset.state=s?.[key]??'UNKNOWN';}
@@ -191,18 +241,35 @@ function showSelectedNode() {
 async function refresh() {
   if(paused||busy||document.hidden)return;
   busy=true;
-  await Promise.all(['node_01','node_02'].map(async node => {
+  const nodeRequests=['node_01','node_02'].map(async node => {
     try {
       const response=await fetch(`/api/${node}?minutes=${el('window').value}`,{signal:AbortSignal.timeout(5000)});
       if(!response.ok)throw new Error('Gateway unavailable');
       const data=await response.json(); if(paused)return;
       snapshots[node]=data;fetchTimes[node]=Date.now();fetchErrors[node]=false;
     } catch { if(!paused)fetchErrors[node]=true; }
-  }));
+  });
+  await Promise.all([...nodeRequests, refreshPredictions()]);
   busy=false; if(!paused)showSelectedNode();
 }
-el('window').addEventListener('change',()=>{if(paused){paused=false;el('pause').textContent='Pause display';el('pause').setAttribute('aria-pressed','false');}refresh();});
-el('pause').addEventListener('click',()=>{paused=!paused;el('pause').textContent=paused?'Resume display':'Pause display';el('pause').setAttribute('aria-pressed',String(paused));freshness();if(!paused)refresh();});
+async function refreshPredictions() {
+  try {
+    const response=await fetch('/api/predictions',{signal:AbortSignal.timeout(5000)});
+    if(!response.ok)throw new Error('Prediction service unavailable');
+    const data=await response.json();
+    if(!['waiting','ready','stale','error'].includes(data.status) || !Number.isFinite(data.server_time))throw new Error('Invalid prediction response');
+    if(['ready','stale'].includes(data.status) && (!data.latest?.values || !Number.isFinite(Date.parse(data.latest.generated_at)) || !Number.isFinite(Date.parse(data.latest.forecast_for))))throw new Error('Missing prediction result');
+    if(paused)return;
+    predictionData=data;predictionFetchTime=Date.now();predictionFailed=false;
+  } catch { if(!paused)predictionFailed=true; }
+}
+function setPaused(value) {
+  paused=value;
+  for(const id of ['pause','prediction-pause']) {el(id).textContent=paused?'Resume display':'Pause display';el(id).setAttribute('aria-pressed',String(paused));}
+  freshness();if(!paused)refresh();
+}
+el('window').addEventListener('change',()=>setPaused(false));
+for(const id of ['pause','prediction-pause']) el(id).addEventListener('click',()=>setPaused(!paused));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(refresh,5000);setInterval(freshness,1000);refresh();
 

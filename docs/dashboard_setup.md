@@ -25,6 +25,18 @@ This copy does not reinstall Mosquitto configuration or overwrite the SQLite dat
 folder. Run one receiver instance only: its persistent MQTT client ID is
 `clam-receiver`. Do not run a second instance on the Mac against the same broker.
 
+For an existing deployment, restart the gateway after copying Python/API changes:
+
+```bash
+ssh -t lihong@192.168.88.250 'sudo systemctl restart clam-gateway && systemctl is-active clam-gateway'
+```
+
+Then refresh the browser. The Prediction dashboard needs the new
+`/api/predictions` endpoint, so its first deployment must include both `gateway/`
+and `web/`. Without a trained model it displays **Waiting for LSTM results**.
+The [prediction results guide](predictions.md) defines the future 12-hour output
+and hourly inference integration; no scheduled prediction job is enabled yet.
+
 ## 2. Configure on the Jetson
 
 In the **Jetson SSH terminal**:

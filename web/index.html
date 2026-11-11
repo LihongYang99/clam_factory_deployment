@@ -14,10 +14,17 @@
 <div id="overview-groups"></div>
 <p class="overview-footnote">Operating limits not configured.</p>
 </section>
+<section id="prediction-view" hidden aria-labelledby="prediction-heading">
+<div class="prediction-heading"><div><h2 id="prediction-heading">Prediction dashboard</h2><p>12 hours ahead / Target update: every hour</p></div><button id="prediction-pause" type="button" aria-pressed="false">Pause display</button></div>
+<p id="prediction-status" class="notice" role="status">Loading prediction results…</p>
+<dl class="prediction-times"><div><dt>Generated</dt><dd id="prediction-generated">—</dd></div><div><dt>Forecast for</dt><dd id="prediction-target">—</dd></div></dl>
+<div class="table-scroll"><table class="prediction-table"><caption>Forecasts are estimates, not sensor readings.</caption><thead><tr><th scope="col">Measurement</th><th scope="col">Latest reading</th><th scope="col">12h forecast</th><th scope="col">Difference</th></tr></thead><tbody id="prediction-rows"></tbody></table></div>
+<p class="prediction-model" id="prediction-model">No LSTM results have been received. Hourly inference is not configured yet.</p>
+</section>
 <section id="planned-view" hidden aria-labelledby="planned-title"><h2 id="planned-title"></h2><p class="planned-state">Not integrated</p><p id="planned-description"></p><dl id="planned-facts"></dl><a href="#overview">Back to overview</a></section>
 <div id="live-detail" hidden>
 <h2 id="detail-title">Dissolved oxygen</h2>
-<p id="temperature-source" class="temperature-source" hidden>Source: Node 01 (DO probe)</p>
+<p id="temperature-source" class="temperature-source" hidden>Source: Node 01 / DO probe</p>
 <p id="notice" class="notice" role="status">Waiting for the first stored reading. No simulated data is displayed.</p>
 <section class="instrument" aria-label="Latest water quality readings">
 <div class="primary-reading"><span>Dissolved oxygen</span><div><strong id="do">—</strong><span class="unit">mg/L</span></div><span id="sample-state">No sample</span></div>

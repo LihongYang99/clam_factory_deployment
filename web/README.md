@@ -4,8 +4,9 @@ Standalone HTML/CSS/JavaScript, served by `gateway/app.py`. No npm install or
 frontend build step. Follow [dashboard setup](../docs/dashboard_setup.md) to
 configure the Jetson receiver and open `http://192.168.88.250:8000`.
 
-The page polls `/api/node_01` every five seconds and shows DO, temperature,
-saturation, sample quality, receive age, 15-minute/one-hour DO history, and an
+The page polls `/api/node_01`, `/api/node_02`, and `/api/predictions` every five
+seconds and shows DO, ORP, source-specific temperatures, oxygen saturation,
+sample quality, receive age, 15-minute/one-hour history, and an
 accessible table of recent samples. Pause display pauses browser polling only;
 the recorder continues collecting. No simulated values are included.
 
@@ -15,7 +16,7 @@ separate from reception freshness. The browser never receives MQTT credentials.
 
 Design: white workspace, deep blue text, restrained blue curve, amber quality
 notice, local system fonts, visible keyboard focus and responsive layout. No
-control actions or BOD predictions are included in this first version.
+control actions or BOD predictions are included in this version.
 
 Chrome rendering was checked at 1440, 900, and 390 pixels wide with isolated test
 responses. Checks covered the logo, horizontal overflow, responsive chart labels,
@@ -46,6 +47,24 @@ Temperature and DO use the same Node 01 telemetry, with separate trend units.
 Other entries describe planned devices and never display invented readings or
 camera images. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
+
+## Prediction dashboard
+
+Select **Prediction dashboard** beside Overview to compare the latest measured
+DO, ORP, and each probe's temperature with a 12-hour LSTM forecast. Differences
+are shown only when both the measurement and prediction are current. Missing
+predictions stay blank; no demo forecasts are published. Results older than
+90 minutes are labeled overdue. API failures and paused displays retain visible
+timestamps and clearly label any cached result as old or paused.
+
+The target cadence is one model run per hour. No trained model or hourly job is
+included yet; browser refresh only reads results. The page shows a waiting state
+until a producer writes a valid batch. See [prediction results](../docs/predictions.md)
+for the result file, units, timestamps, and model integration contract.
+
+This feature adds a gateway API. Deploy **both `web/` and `gateway/`**, then restart
+`clam-gateway` as described in [dashboard setup](../docs/dashboard_setup.md).
+Copying only `web/` to an older gateway will show a prediction API error.
 
 Run the isolated browser regression check from the repository root:
 

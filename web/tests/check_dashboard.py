@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from playwright.sync_api import sync_playwright, expect
@@ -33,6 +34,11 @@ with tempfile.TemporaryDirectory() as folder:
             orp_payload = dict(payload, latest={'received_at': now-5, 'sample':dict(SAMPLE, node_id='node_02', orp_mv=-120, temperature_c=23.4)}, history=[{'received_at':now-5,'sample':dict(SAMPLE,node_id='node_02',orp_mv=-120,temperature_c=23.4)}])
             page.route('**/api/node_02*', lambda r: r.fulfill(json=orp_payload))
             page.route('**/api/node_01*', lambda r: r.fulfill(json=payload))
+            prediction_payload = {'status':'waiting', 'server_time':now, 'horizon_hours':12, 'interval_hours':1, 'latest':None}
+            page.route('**/api/predictions', lambda r: r.fulfill(json=prediction_payload))
+            stamp = lambda value: datetime.fromtimestamp(value, timezone.utc).isoformat()
+            prediction_result = {'generated_at':stamp(now-60), 'forecast_for':stamp(now-60+12*3600), 'model_version':'lstm-test-v1',
+                                 'values':{'do':5.91, 'orp':-95, 'temperature':25.8, 'temperature_orp':None}}
             url = f'http://127.0.0.1:{server.server_port}'
             output = ROOT / 'build/dashboard'
             output.mkdir(parents=True, exist_ok=True)
@@ -41,6 +47,8 @@ with tempfile.TemporaryDirectory() as folder:
                 page.goto(url)
                 page.wait_for_function("document.querySelector('#value-do').textContent === '6.18 mg/L'")
                 assert page.locator('#overview').is_visible()
+                expect(page.locator('#sensor-nav a[href="#do"]')).to_have_css('font-size', '14.5px')
+                expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '18.5px')
                 expect(page.locator('#value-ph')).to_have_css('color', 'rgb(180, 35, 24)')
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -51,6 +59,7 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#live-detail')).to_be_visible()
                 expect(page.locator('#chart-title')).to_have_text('Temperature history')
                 expect(page.locator('#temperature-source')).to_be_visible()
+                expect(page.locator('#temperature-source')).to_have_text('Source: Node 01 / DO probe')
                 assert '25.32 °C' in page.locator('#chart title').first.text_content()
                 page.locator('#sensor-nav a[href="#do"]').click()
                 expect(page.locator('#chart title').first).to_contain_text('6.18 mg/L')
@@ -72,12 +81,53 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#do')).to_have_text('-120.00')
                 expect(page.locator('#temp')).to_have_text('23.40')
                 expect(page.locator('#chart title').first).to_contain_text('-120.00 mV')
+                expect(page.locator('#live-detail thead th').nth(1)).to_have_text('ORP (mV)')
                 page.locator('#sensor-nav a[href="#do"]').click()
                 expect(page.locator('#do')).to_have_text('6.18')
                 page.locator('#pause').click()
                 assert page.locator('#connection').inner_text() == 'Display paused'
                 page.locator('#pause').click()
+                page.evaluate('window.scrollTo(0, 0)')
+                page.wait_for_timeout(300)
+                assert page.evaluate("""() => {
+                    const marker = document.querySelector('#nav-indicator').getBoundingClientRect();
+                    const active = document.querySelector('#sensor-nav [aria-current]').getBoundingClientRect();
+                    return Math.abs(marker.left - active.left) < 1 &&
+                      Math.abs(marker.top - (innerWidth <= 760 ? active.bottom - 4 : active.top)) < 1;
+                }""")
                 page.screenshot(path=str(output/f'detail-{width}.png'), full_page=True)
+                prediction_payload.update(status='waiting', latest=None)
+                page.locator('#sensor-nav a[href="#predictions"]').click()
+                page.evaluate('refresh()')
+                expect(page.locator('#prediction-view')).to_be_visible()
+                expect(page.locator('#prediction-status')).to_have_text('Waiting for LSTM results')
+                expect(page.locator('#prediction-forecast-do')).to_have_text('—')
+                assert page.locator('#overview').is_hidden() and page.locator('#live-detail').is_hidden()
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.evaluate('window.scrollTo(0, 0)')
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(output/f'predictions-waiting-{width}.png'), full_page=True)
+                prediction_payload.update(status='ready', latest=prediction_result)
+                page.evaluate('refresh()')
+                expect(page.locator('#prediction-forecast-do')).to_have_text('5.91 mg/L')
+                expect(page.locator('#prediction-current-orp')).to_have_text('-120.00 mV')
+                expect(page.locator('#prediction-difference-do')).to_have_text('-0.27 mg/L')
+                expect(page.locator('#prediction-difference-orp')).to_have_text('+25.00 mV')
+                expect(page.locator('#prediction-forecast-temperature_orp')).to_have_text('—')
+                expect(page.locator('.prediction-table thead th').nth(1)).to_have_text('Latest reading')
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.evaluate('window.scrollTo(0, 0)')
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(output/f'predictions-ready-{width}.png'), full_page=True)
+                page.locator('#prediction-rows a[href="#temperature_orp"]').click()
+                expect(page.locator('#temperature-source')).to_have_text('Source: Node 02 / ORP probe')
+                page.go_back()
+                expect(page.locator('#prediction-view')).to_be_visible()
+                page.locator('#prediction-pause').click()
+                expect(page.locator('#prediction-status')).to_contain_text('Display paused')
+                expect(page.locator('#prediction-difference-do')).to_have_text('—')
+                page.locator('#prediction-pause').click()
+                expect(page.locator('#prediction-status')).to_have_text('Latest LSTM predictions')
                 for name in ['turbidity', 'tss', 'ph', 'uv254', 'camera']:
                     page.locator(f'#sensor-nav a[href="#{name}"]').click()
                     expect(page.locator('#planned-view')).to_be_visible()
@@ -87,6 +137,25 @@ with tempfile.TemporaryDirectory() as folder:
             payload['server_time'] = now+100
             page.goto(url)
             page.wait_for_function("document.querySelector('#state-do').textContent === 'Telemetry stale'")
+            page.goto(url+'#predictions')
+            expect(page.locator('#prediction-source-state-do')).to_have_text('Stale reading')
+            expect(page.locator('#prediction-difference-do')).to_have_text('—')
+            prediction_payload['server_time'] = now+2*3600
+            page.evaluate('refresh()')
+            expect(page.locator('#prediction-status')).to_contain_text('Update overdue')
+            expect(page.locator('#prediction-forecast-do')).to_have_text('5.91 mg/L')
+            prediction_payload.update(status='error', latest=None)
+            page.evaluate('refresh()')
+            expect(page.locator('#prediction-status')).to_contain_text('Prediction data unavailable')
+            expect(page.locator('#prediction-forecast-do')).to_have_text('—')
+            prediction_payload.update(status='ready', server_time=now, latest=prediction_result)
+            page.evaluate('refresh()')
+            expect(page.locator('#prediction-status')).to_have_text('Latest LSTM predictions')
+            page.unroute('**/api/predictions')
+            page.route('**/api/predictions', lambda r: r.fulfill(status=503, body='unavailable'))
+            page.evaluate('refresh()')
+            expect(page.locator('#prediction-status')).to_contain_text('Displayed forecasts may be old')
+            expect(page.locator('#prediction-difference-orp')).to_have_text('—')
             payload['history'] = []
             payload['latest'] = None
             page.reload()
@@ -102,4 +171,4 @@ with tempfile.TemporaryDirectory() as folder:
     finally:
         server.shutdown()
         server.server_close()
-print('PASS: responsive overview, sensor routing/history, chart units, planned devices, pause, stale, empty, API failure.')
+print('PASS: responsive overview, sensor routing/history, prediction routing/units/states, planned devices, pause, stale, empty, API failure.')

@@ -9,7 +9,7 @@ import re
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
@@ -87,6 +87,46 @@ def validate(topic, payload):
     return data
 
 
+def prediction_snapshot(path, now=None):
+    now = time.time() if now is None else now
+    result = {'status': 'waiting', 'server_time': now, 'horizon_hours': 12,
+              'interval_hours': 1, 'latest': None}
+    try:
+        with Path(path).open('rb') as source:
+            raw = source.read(8193)
+        if len(raw) > 8192:
+            raise ValueError('prediction file too large')
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError('expected prediction object')
+        stamps = []
+        for key in ('generated_at', 'forecast_for'):
+            value = data.get(key)
+            if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)', value):
+                raise ValueError('prediction timestamps must be UTC')
+            stamps.append(datetime.fromisoformat(value.replace('Z', '+00:00')))
+        generated, target = stamps
+        if generated.timestamp() > now or target - generated != timedelta(hours=12):
+            raise ValueError('invalid prediction time range')
+        model = data.get('model_version')
+        if not isinstance(model, str) or not model.strip() or len(model) > 120:
+            raise ValueError('invalid model version')
+        values = data.get('values')
+        allowed = {'do', 'orp', 'temperature', 'temperature_orp'}
+        if not isinstance(values, dict) or not set(values) <= allowed:
+            raise ValueError('invalid prediction measurements')
+        for value in values.values():
+            if value is not None and (type(value) not in (int, float) or not math.isfinite(value)):
+                raise ValueError('invalid predicted value')
+        result['latest'] = {key: data[key] for key in ('generated_at', 'forecast_for', 'model_version', 'values')}
+        result['status'] = 'stale' if now - generated.timestamp() > 90 * 60 else 'ready'
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, TypeError, OverflowError, RecursionError):
+        result['status'] = 'error'
+    return result
+
+
 class Store:
     def __init__(self, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -127,11 +167,15 @@ class Store:
                 'history': [unpack(row) for row in reversed(rows)], 'stale_after_seconds': 20}
 
 
-def handler_for(store):
+def handler_for(store, prediction_path=None):
+    prediction_path = ROOT / 'data' / 'predictions.json' if prediction_path is None else prediction_path
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlsplit(self.path)
-            if url.path in ('/api/node_01', '/api/node_02'):
+            if url.path == '/api/predictions':
+                body = json.dumps(prediction_snapshot(prediction_path), allow_nan=False).encode()
+                mime = 'application/json'
+            elif url.path in ('/api/node_01', '/api/node_02'):
                 try:
                     minutes = int(parse_qs(url.query).get('minutes', ['15'])[0])
                     if minutes not in (15, 60):
