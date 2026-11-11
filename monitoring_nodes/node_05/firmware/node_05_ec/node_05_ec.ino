@@ -6,10 +6,11 @@
 #include <esp_timer.h>
 #include <time.h>
 #include "Protocol.h"
+#include "Calibration.h"
 #include "arduino_secrets.h"
 
 constexpr char NODE_ID[] = "node_05";
-constexpr char VERSION[] = "0.1.2";
+constexpr char VERSION[] = "0.1.3";
 constexpr char TELEMETRY_TOPIC[] = "clam/node_05/telemetry";
 constexpr char STATUS_TOPIC[] = "clam/node_05/status";
 constexpr int EC_TX = 17;
@@ -36,6 +37,7 @@ bool probeReady = false;
 bool kWriteAttempted = false;
 double configuredK = NAN;
 double compensationTemperature = NAN;
+ezoec::Calibration calibration;
 
 void onTimeSync(struct timeval*) { clockSynced = true; }
 
@@ -130,7 +132,8 @@ void sample() {
   ++sequence;
   ezoec::Reply reply;
   const char* error = nullptr;
-  if (!probeReady) {
+  // Continue reading after transient errors in CAL mode without changing settings.
+  if (!probeReady && !calibration.active) {
     error = initializeProbe(reply);
     probeReady = !error;
   }
@@ -173,13 +176,107 @@ void sample() {
     return;
   }
   printLine(payload);
+  if (calibration.active) return;  // Standards must not enter the process history.
   // shortcut: no offline queue; add durable buffering before unattended research logging.
   if (!mqtt.connected() || !mqtt.publish(TELEMETRY_TOPIC, payload, false, 1)) ++notForwarded;
 }
 
+const char* calibrationSettings(ezoec::Reply& reply, double& mode) {
+  const char* error = transact("K,?", true, reply);
+  if (error) return error;
+  if (!ezoec::setting(reply.data, "?K,", configuredK)) return "INVALID_CONFIG";
+  if ((error = transact("T,?", true, reply))) return error;
+  if (!ezoec::setting(reply.data, "?T,", compensationTemperature)) return "INVALID_CONFIG";
+  if ((error = transact("Cal,?", true, reply))) return error;
+  if (!ezoec::setting(reply.data, "?Cal,", mode) || mode < 0 || mode > 2 || mode != floor(mode))
+    return "INVALID_CONFIG";
+  return nullptr;
+}
+
+void calibrationStatus() {
+  ezoec::Reply reply;
+  double mode = NAN;
+  const char* error = calibrationSettings(reply, mode);
+  char line[240];
+  snprintf(line, sizeof(line),
+           "event=CAL_STATUS mode=%s next=%s result=%s probe_k=%.2f compensation_temperature_c=%.2f cal_mode=%.0f calibration_status=UNVERIFIED",
+           calibration.active ? "ON" : "OFF", calibration.stage(), error ? error : "OK",
+           configuredK, compensationTemperature, mode);
+  printLine(line);
+  if (calibration.active && calibration.next == ezoec::Calibration::VERIFY)
+    printLine(!error && calibration.sequenceConfirmed(mode)
+        ? "event=CAL_SEQUENCE_CONFIRMED standard_rechecks_required=true calibration_status=UNVERIFIED"
+        : "event=CAL_SEQUENCE_NOT_CONFIRMED check_CAL_STATUS do_not_repeat_writes=true");
+}
+
+void calibrate(ezoec::Calibration::Step step, const char* command, double target) {
+  const char* error = calibration.check(step);
+  ezoec::Reply reply;
+  double mode = NAN, reading = NAN;
+  if (!error) error = transact("i", true, reply);
+  if (!error && !ezoec::startsWith(reply.data, "?I,EC,")) error = "WRONG_SENSOR";
+  if (!error) error = calibrationSettings(reply, mode);
+  if (!error && fabs(configuredK - PROBE_K) > 0.001) error = "K10_REQUIRED";
+  if (!error && fabs(compensationTemperature - 25.0) > 0.001) error = "T25_REQUIRED";
+  // Dry calibration can correct a nonzero air reading; dryness is operator-confirmed.
+  if (!error && step != ezoec::Calibration::DRY) {
+    error = transact("R", true, reply);
+    if (!error) error = ezoec::conductivity(reply.data, reading);
+    if (!error && reading == 0) error = "ZERO_READING_IN_STANDARD";
+    if (!error && fabs(reading - target) > target * 0.4)
+      printLine("event=CAL_READING_WARNING outside_approximate_40_percent=true");
+  }
+  if (error) {
+    char line[160];
+    snprintf(line, sizeof(line), "event=CAL_COMMAND_REJECTED reason=%s next=%s", error, calibration.stage());
+    printLine(line);
+    return;
+  }
+  // Only this explicit USB command writes calibration; never retry uncertain writes.
+  error = transact(command, false, reply);
+  char raw[257] = "";
+  for (size_t i = 0; i < reply.count; ++i) snprintf(raw + i * 2, 3, "%02X", reply.raw[i]);
+  char line[400];
+  snprintf(line, sizeof(line), "event=CAL_REPLY command=%s result=%s raw_hex=%s", command, error ? error : "ACK", raw);
+  printLine(line);
+  calibration.written(!error);
+  if (error) {
+    printLine("event=CAL_WRITE_UNCONFIRMED no_auto_retry=true restart_full_procedure_if_needed=true");
+    return;
+  }
+  snprintf(line, sizeof(line), "event=CAL_STEP_ACK next=%s calibration_status=UNVERIFIED", calibration.stage());
+  printLine(line);
+  calibrationStatus();  // Intermediate Cal,? modes are not interpreted as step ACKs.
+}
+
+void serviceCalibration() {
+  static ezoec::CalibrationInput input;
+  while (Serial.available()) {
+    if (!input.push(char(Serial.read()))) continue;
+    if (input.invalid) printLine("event=CAL_COMMAND_REJECTED reason=INVALID_LINE");
+    else if (!input.text[0]) { /* Ignore blank lines. */ }
+    else if (!strcmp(input.text, "CAL STATUS")) calibrationStatus();
+    else if (!strcmp(input.text, "CAL BEGIN")) {
+      calibration.begin();
+      printLine("event=CAL_MODE telemetry_paused=true serial_readings_continue=true");
+      calibrationStatus();
+    } else if (!strcmp(input.text, "CAL DRY CONFIRM"))
+      calibrate(ezoec::Calibration::DRY, "Cal,dry", 0);
+    else if (!strcmp(input.text, "CAL LOW 12880 CONFIRM"))
+      calibrate(ezoec::Calibration::LOW_POINT, "Cal,low,12880", 12880);
+    else if (!strcmp(input.text, "CAL HIGH 150000 CONFIRM"))
+      calibrate(ezoec::Calibration::HIGH_POINT, "Cal,high,150000", 150000);
+    else if (!strcmp(input.text, "CAL END")) {
+      calibration.end();
+      printLine("event=CAL_MODE telemetry_paused=false calibration_status=UNVERIFIED");
+    } else printLine("event=CAL_COMMAND_REJECTED reason=UNKNOWN_COMMAND");
+    input = {};
+  }
+}
+
 void setup() {
   Serial.begin(115200);
-  printLine("event=BOOT node=node_05 firmware=0.1.2");
+  printLine("event=BOOT node=node_05 firmware=0.1.3");
   probe.begin(9600, SERIAL_8N1, EC_RX, EC_TX);
   snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
   snprintf(clientId, sizeof(clientId), "clam-node05-%012llx", (unsigned long long)ESP.getEfuseMac());
@@ -201,6 +298,7 @@ void setup() {
 
 void loop() {
   serviceNetwork();
+  serviceCalibration();
   const uint32_t now = millis();
   if (now - lastPoll >= POLL_MS) {
     lastPoll = now;

@@ -2,23 +2,23 @@
 
 Atlas Scientific EZO-EC over UART, with a physical **K10 probe confirmed by the
 operator**. Read-only identification confirmed an **ESP32-S3 v0.2 with 16 MB
-flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.2` was
-compiled, uploaded, and checked on hardware on November 11, 2026. UART acquisition,
+flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.3` adds
+explicit USB calibration commands. UART acquisition,
 Wi-Fi at temporary DHCP address `192.168.88.97`, and NTP synchronization are verified.
 MQTT is still disabled; broker delivery and the `.105` reservation remain pending.
+The 0.1.3 host tests and ESP32 build passed; upload hashes and the on-device
+version were verified. `CAL BEGIN` and `CAL STATUS` responded correctly, with
+USB readings continuing while the forwarding counter remained unchanged.
+Dry/low/high writes have not yet been exercised on hardware.
 
-The circuit initially reported K=1, compensation setting 25°C, and calibration
-mode 0. Firmware corrected the confirmed physical probe type to K10 and verified
-it by reading the setting back. The initial zero readings were in air. After
-immersion in tap water, readings remained mostly zero, with one reported transient
-of 3,971,000 µS/cm. The operator confirmed immersion and a locked BNC connection.
-The water measurement is **not verified**; do not calibrate away this anomaly.
-No temperature-compensation or calibration command was sent.
-Firmware 0.1.2 reports `?STATUS,P,3.87` (last restart: power cycle; EZO-side
-supply: 3.87 V), K10, and calibration mode 0. Water readings still return zero.
-This voltage snapshot does not establish that the complete measurement hardware
-is working. The firmware build and host protocol tests, including range limits,
-passed; upload hashes were verified.
+The circuit initially reported K=1 and calibration mode 0; firmware configured
+the confirmed physical K10 probe and read the setting back. The latest settings
+are K10, compensation 25°C, calibration mode 0, and EZO-side supply 3.87 V.
+After the operator retightened the **SMA threaded probe connector**, readings in
+undiluted 12,880 µS/cm standard changed from zero to approximately 8,400 µS/cm,
+with some drift. This is a response check, not verified measurement accuracy.
+No calibration writes have yet been confirmed. Both standards are available;
+the operator is preparing the dry probe for the procedure below.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
 dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
@@ -50,8 +50,9 @@ if K differs from 10 and `Cal,?` reports mode 0, it sends `K,10` and requires
 acknowledged K=10 readback. It attempts that write at most once per boot; an
 uncertain result is followed by fresh queries, not repeated writes. A mismatch
 with existing calibration mode 1 or 2 remains `CONFIG_MISMATCH` with null EC.
-It never writes temperature compensation or calibration commands. Setting the
-probe type does not establish measurement accuracy; calibration stays UNVERIFIED.
+It does not write temperature compensation. Calibration writes occur only after
+explicit USB commands in calibration mode, as described below. Setting the probe
+type does not establish measurement accuracy; calibration stays UNVERIFIED.
 
 Telemetry uses `clam/node_05/telemetry` and `clam/node_05/status`:
 
@@ -71,6 +72,8 @@ is not interpreted as an exact upper limit.
 Unsynchronized sample time remains null. There is no offline queue;
 `not_forwarded_before_sample` counts samples not forwarded, including while
 MQTT is disabled.
+Calibration mode pauses MQTT telemetry while USB readings continue; intentionally
+paused readings do not increment this counter.
 
 ## 1. Identify the board on the Mac
 
@@ -115,6 +118,8 @@ Optional host protocol check, with no attached device required:
 ```bash
 c++ -std=c++11 -Wall -Wextra -Werror monitoring_nodes/node_05/tests/protocol_test.cpp -o /tmp/clam-node05-protocol-test
 /tmp/clam-node05-protocol-test
+c++ -std=c++11 -Wall -Wextra -Werror monitoring_nodes/node_05/tests/calibration_test.cpp -o /tmp/clam-node05-calibration-test
+/tmp/clam-node05-calibration-test
 ```
 
 ## 3. Upload and inspect USB output
@@ -128,12 +133,12 @@ port, then upload in the same Mac terminal:
 ```
 
 If needed, press RESET once without BOOT to start the application. Expect
-`node_05`, firmware `0.1.2`, and `event=EC_CONFIG` showing the queried K,
+`node_05`, firmware `0.1.3`, and `event=EC_CONFIG` showing the queried K,
 compensation setting, and calibration mode. For K10, initialization should reach
 `event=EC_READY`; subsequent JSON should contain actual conductivity and
 `sensor_status=OK`. A timeout, wrong sensor, or configuration error must remain
 visible with null conductivity. Record the exact diagnostic before changing
-settings. `EC_K_CONFIGURING` and `EC_K_CONFIRMED` identify the guarded K10 setup. No calibration command interface is included.
+settings. `EC_K_CONFIGURING` and `EC_K_CONFIRMED` identify the guarded K10 setup.
 
 `event=EC_POWER response=?Status,P,3.300` is an example diagnostic, not a recorded
 value: `Status` queries EZO-side supply voltage and the last restart reason
@@ -146,6 +151,65 @@ before calibration. Disconnect power before reseating hardware.
 Check `event=STATUS` for the current station MAC, DHCP IP, and Wi-Fi connection.
 `mqtt=DISABLED` is expected until the account is configured. `clock_status`
 becomes `SYNCED` only after a successful NTP response from `192.168.88.250`.
+
+## Calibrate the K10 probe through USB
+
+Use the [Atlas EZO-EC datasheet V6.7, pp. 66–71](https://files.atlas-scientific.com/EC_EZO_Datasheet.pdf).
+This firmware supports the kit's **12,880 µS/cm low** and **150,000 µS/cm high**
+standards. Use separate clean portions of undiluted solution, fully immerse the
+sensing area, remove trapped bubbles, and wait for stable readings at each wet
+point. Do not pour used solution back into its bottle.
+
+Keep the EZO temperature-compensation setting at **25°C during calibration**.
+This is a setting, not a water-temperature measurement. If a standard's actual
+temperature is 5°C or more away from 25°C, stop: use its temperature-specific
+conductivity from the bottle and adapt the commands before proceeding. The
+fixed commands below do not support other target values.
+
+Open the monitor from section 3 at 115200 baud. While it is running, type each
+command below into that terminal and press **Return**. These commands go to the
+ESP32; they are not macOS shell commands. If the `%` shell prompt is visible,
+restart the monitor first. In Arduino IDE, select **Newline** as the line ending.
+Do not paste the complete calibration sequence at once.
+
+1. **Enter calibration mode.** Send `CAL BEGIN`, then `CAL STATUS`.
+   Expect `mode=ON next=DRY`, `probe_k=10.00`, and
+   `compensation_temperature_c=25.00`. MQTT telemetry pauses to keep standards
+   out of the process history; USB readings and Wi-Fi continue.
+2. **Dry point.** Rinse with DI water, shake off excess, and let the sensing end
+   air-dry completely. Only when physically dry, send `CAL DRY CONFIRM`.
+   Expect `command=Cal,dry result=ACK` and `next=LOW`. A nonzero reading before
+   the dry command is possible; the expected reading after dry calibration is zero.
+3. **Low point.** Put the dry probe into fresh 12,880 µS/cm standard. Wait until
+   readings stabilize, then send `CAL LOW 12880 CONFIRM`.
+   Expect `command=Cal,low,12880 result=ACK` and `next=HIGH`.
+   **The low-point write does not immediately change readings.**
+4. **High point.** Rinse with DI water and shake off excess. Immerse in fresh
+   150,000 µS/cm standard and wait until stable. Send `CAL HIGH 150000 CONFIRM`.
+   Expect `command=Cal,high,150000 result=ACK`, `next=VERIFY`, `cal_mode=2`,
+   and `event=CAL_SEQUENCE_CONFIRMED`. The high point completes the correction.
+5. **Recheck.** Keep calibration mode on. Check stable readings in fresh high
+   standard, rinse, and check fresh low standard without sending further point
+   commands. Record actual readings, solution temperatures, standards/lot numbers,
+   and timestamps. Command acknowledgements and stored mode 2 establish the
+   sequence, not the accuracy of these rechecks. The firmware therefore retains
+   `calibration_status=UNVERIFIED`; it does not generate a verified date.
+6. **Resume.** Rinse and return the probe to the process sample before sending
+   `CAL END`. MQTT telemetry resumes. `CAL END` does not undo probe writes.
+
+`CAL STATUS` is read-only. Repeating `CAL BEGIN` while already in mode preserves
+progress. Sequence progress is in ESP32 RAM and is lost on reset or `CAL END`;
+this does not imply that calibration stored inside the EZO was erased.
+Neither boot nor `CAL BEGIN` writes calibration values or clears old points.
+
+If a write returns `CAL_WRITE_UNCONFIRMED`, stop. The firmware blocks further
+points and does not retry automatically; the probe may have received the write
+even if its acknowledgement was lost. Retain the raw reply, resolve the fault,
+then use `CAL END` / `CAL BEGIN` and repeat the full physical procedure if needed.
+`CAL_SEQUENCE_NOT_CONFIRMED` after an acknowledged high point calls for a fresh
+`CAL STATUS` query, not another high-point write. A zero reading in wet standard
+is rejected. Readings outside Atlas's approximate ±40% pre-calibration guidance
+produce a warning; that guidance is not an accuracy tolerance.
 
 ## 4. Enable MQTT and the dashboard
 
