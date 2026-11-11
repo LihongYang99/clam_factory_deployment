@@ -109,7 +109,7 @@ separate acquisition device; slot 06 is reserved without assuming an ESP32.
 | 02 / `node_02` | ORP + temperature if supported | Planned |
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
-| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity (Atlas EZO-EC, K10 probe) | Firmware 0.1.0 uploaded to ESP32-S3 N16R8; live acquisition pending |
+| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity (Atlas EZO-EC, K10 probe) | Firmware 0.1.1; USB EC responses, Wi-Fi and NTP verified; MQTT pending |
 | 06 / `camera_06` | RGB images | Reserved; interface and hardware to confirm |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 

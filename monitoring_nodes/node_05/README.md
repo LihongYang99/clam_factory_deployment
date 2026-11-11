@@ -2,10 +2,16 @@
 
 Atlas Scientific EZO-EC over UART, with a physical **K10 probe confirmed by the
 operator**. Read-only identification confirmed an **ESP32-S3 v0.2 with 16 MB
-flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.0` was
-compiled and uploaded with flash-hash verification. UART wiring confirmation, the circuit's stored K
-value, calibration, and live delivery remain pending. No EC response has yet
-been verified, and no calibration has been performed for this deployment.
+flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.1` was
+compiled, uploaded, and checked on hardware on November 11, 2026. UART acquisition,
+Wi-Fi at temporary DHCP address `192.168.88.97`, and NTP synchronization are verified.
+MQTT is still disabled; broker delivery and the `.105` reservation remain pending.
+
+The circuit initially reported K=1, compensation setting 25°C, and calibration
+mode 0. Firmware corrected the confirmed physical probe type to K10 and verified
+it by reading the setting back. Repeated EC responses are `0.00` µS/cm with `*OK`;
+the sampling environment has not yet been recorded. This establishes communication,
+not measurement accuracy. No temperature-compensation or calibration command was sent.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
 dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
@@ -32,10 +38,13 @@ requires the numeric response plus `*OK`.
 
 Initialization disables continuous output, enables acknowledgements, queries
 `i`, `K,?`, `T,?`, and `Cal,?`, then enables EC output and disables TDS, salinity,
-and specific gravity. It never writes a K value, temperature compensation, or
-calibration. If the stored K differs from 10, `CONFIG_MISMATCH` keeps conductivity
-null. Resolve that mismatch deliberately before using measurements; do not
-assume that changing K preserves the validity of an earlier calibration.
+and specific gravity. Firmware 0.1.1 matches the confirmed physical K10 probe:
+if K differs from 10 and `Cal,?` reports mode 0, it sends `K,10` and requires
+acknowledged K=10 readback. It attempts that write at most once per boot; an
+uncertain result is followed by fresh queries, not repeated writes. A mismatch
+with existing calibration mode 1 or 2 remains `CONFIG_MISMATCH` with null EC.
+It never writes temperature compensation or calibration commands. Setting the
+probe type does not establish measurement accuracy; calibration stays UNVERIFIED.
 
 Telemetry uses `clam/node_05/telemetry` and `clam/node_05/status`:
 
@@ -107,12 +116,12 @@ port, then upload in the same Mac terminal:
 ```
 
 If needed, press RESET once without BOOT to start the application. Expect
-`node_05`, firmware `0.1.0`, and `event=EC_CONFIG` showing the queried K,
+`node_05`, firmware `0.1.1`, and `event=EC_CONFIG` showing the queried K,
 compensation setting, and calibration mode. For K10, initialization should reach
 `event=EC_READY`; subsequent JSON should contain actual conductivity and
 `sensor_status=OK`. A timeout, wrong sensor, or configuration error must remain
 visible with null conductivity. Record the exact diagnostic before changing
-settings. No calibration command interface is included.
+settings. `EC_K_CONFIGURING` and `EC_K_CONFIRMED` identify the guarded K10 setup. No calibration command interface is included.
 
 Check `event=STATUS` for the current station MAC, DHCP IP, and Wi-Fi connection.
 `mqtt=DISABLED` is expected until the account is configured. `clock_status`

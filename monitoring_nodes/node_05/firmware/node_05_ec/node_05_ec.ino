@@ -9,7 +9,7 @@
 #include "arduino_secrets.h"
 
 constexpr char NODE_ID[] = "node_05";
-constexpr char VERSION[] = "0.1.0";
+constexpr char VERSION[] = "0.1.1";
 constexpr char TELEMETRY_TOPIC[] = "clam/node_05/telemetry";
 constexpr char STATUS_TOPIC[] = "clam/node_05/status";
 constexpr int EC_TX = 17;
@@ -33,6 +33,7 @@ uint32_t lastMqttAttempt = 0;
 uint32_t lastStatus = 0;
 uint32_t lastPoll = 0;
 bool probeReady = false;
+bool kWriteAttempted = false;
 double configuredK = NAN;
 double compensationTemperature = NAN;
 
@@ -102,8 +103,17 @@ const char* initializeProbe(ezoec::Reply& reply) {
            "event=EC_CONFIG probe_k=%.2f expected_k=%.2f compensation_temperature_c=%.2f cal_mode=%d",
            configuredK, PROBE_K, compensationTemperature, int(calibration));
   printLine(settings);
-  // Never change inherited K or calibration silently.
-  if (fabs(configuredK - PROBE_K) > 0.001) return "CONFIG_MISMATCH";
+  if (fabs(configuredK - PROBE_K) > 0.001) {
+    // Set the confirmed K10 probe type only on an uncalibrated circuit.
+    if (calibration != 0 || kWriteAttempted) return "CONFIG_MISMATCH";
+    kWriteAttempted = true;
+    printLine("event=EC_K_CONFIGURING target=10 cal_mode=0");
+    if ((error = transact("K,10", false, reply))) return error;
+    if ((error = transact("K,?", true, reply))) return error;
+    if (!ezoec::setting(reply.data, "?K,", configuredK) ||
+        fabs(configuredK - PROBE_K) > 0.001) return "CONFIG_MISMATCH";
+    printLine("event=EC_K_CONFIRMED probe_k=10 calibration=UNVERIFIED");
+  }
   for (const char* command : {"O,EC,1", "O,TDS,0", "O,S,0", "O,SG,0"}) {
     if ((error = transact(command, false, reply))) return error;
   }
@@ -164,7 +174,7 @@ void sample() {
 
 void setup() {
   Serial.begin(115200);
-  printLine("event=BOOT node=node_05 firmware=0.1.0");
+  printLine("event=BOOT node=node_05 firmware=0.1.1");
   probe.begin(9600, SERIAL_8N1, EC_RX, EC_TX);
   snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
   snprintf(clientId, sizeof(clientId), "clam-node05-%012llx", (unsigned long long)ESP.getEfuseMac());
