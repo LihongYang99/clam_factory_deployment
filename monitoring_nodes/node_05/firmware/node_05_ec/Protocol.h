@@ -82,8 +82,11 @@ inline bool setting(const char* data, const char* prefix, double& value) {
   return startsWith(data, prefix) && decimal(data + strlen(prefix), value);
 }
 
-inline bool conductivity(const char* data, double& value) {
-  return decimal(data, value) && value >= 0;
+inline const char* conductivity(const char* data, double& value) {
+  if (!decimal(data, value) || value < 0) return "INVALID_READING";
+  // K10 probe upper range: 1 S/cm (Atlas EZO-EC datasheet V6.7, p. 3).
+  if (value > 1000000) return "OUT_OF_RANGE";
+  return nullptr;
 }
 
 }  // namespace ezoec

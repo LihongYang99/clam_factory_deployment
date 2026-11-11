@@ -9,7 +9,7 @@
 #include "arduino_secrets.h"
 
 constexpr char NODE_ID[] = "node_05";
-constexpr char VERSION[] = "0.1.1";
+constexpr char VERSION[] = "0.1.2";
 constexpr char TELEMETRY_TOPIC[] = "clam/node_05/telemetry";
 constexpr char STATUS_TOPIC[] = "clam/node_05/status";
 constexpr int EC_TX = 17;
@@ -88,6 +88,11 @@ const char* initializeProbe(ezoec::Reply& reply) {
   if (error) return error;
   if ((error = transact("i", true, reply))) return error;
   if (!ezoec::startsWith(reply.data, "?I,EC,")) return "WRONG_SENSOR";
+  if ((error = transact("Status", true, reply))) return error;
+  if (!ezoec::startsWith(reply.data, "?Status,")) return "UNEXPECTED_FRAME";
+  char power[96];
+  snprintf(power, sizeof(power), "event=EC_POWER response=%s", reply.data);
+  printLine(power);
   if ((error = transact("K,?", true, reply))) return error;
   if (!ezoec::setting(reply.data, "?K,", configuredK) || configuredK <= 0)
     return "INVALID_CONFIG";
@@ -140,7 +145,7 @@ void sample() {
   }
   double conductivity = 0;
   if (!error) error = transact("R", true, reply);
-  if (!error && !ezoec::conductivity(reply.data, conductivity)) error = "INVALID_READING";
+  if (!error) error = ezoec::conductivity(reply.data, conductivity);
   if (error) probeReady = false;
 
   char raw[257] = "";
@@ -174,7 +179,7 @@ void sample() {
 
 void setup() {
   Serial.begin(115200);
-  printLine("event=BOOT node=node_05 firmware=0.1.1");
+  printLine("event=BOOT node=node_05 firmware=0.1.2");
   probe.begin(9600, SERIAL_8N1, EC_RX, EC_TX);
   snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
   snprintf(clientId, sizeof(clientId), "clam-node05-%012llx", (unsigned long long)ESP.getEfuseMac());

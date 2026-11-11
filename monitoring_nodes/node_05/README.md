@@ -2,16 +2,23 @@
 
 Atlas Scientific EZO-EC over UART, with a physical **K10 probe confirmed by the
 operator**. Read-only identification confirmed an **ESP32-S3 v0.2 with 16 MB
-flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.1` was
+flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.2` was
 compiled, uploaded, and checked on hardware on November 11, 2026. UART acquisition,
 Wi-Fi at temporary DHCP address `192.168.88.97`, and NTP synchronization are verified.
 MQTT is still disabled; broker delivery and the `.105` reservation remain pending.
 
 The circuit initially reported K=1, compensation setting 25°C, and calibration
 mode 0. Firmware corrected the confirmed physical probe type to K10 and verified
-it by reading the setting back. Repeated EC responses are `0.00` µS/cm with `*OK`;
-the sampling environment has not yet been recorded. This establishes communication,
-not measurement accuracy. No temperature-compensation or calibration command was sent.
+it by reading the setting back. The initial zero readings were in air. After
+immersion in tap water, readings remained mostly zero, with one reported transient
+of 3,971,000 µS/cm. The operator confirmed immersion and a locked BNC connection.
+The water measurement is **not verified**; do not calibrate away this anomaly.
+No temperature-compensation or calibration command was sent.
+Firmware 0.1.2 reports `?STATUS,P,3.87` (last restart: power cycle; EZO-side
+supply: 3.87 V), K10, and calibration mode 0. Water readings still return zero.
+This voltage snapshot does not establish that the complete measurement hardware
+is working. The firmware build and host protocol tests, including range limits,
+passed; upload hashes were verified.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
 dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
@@ -37,7 +44,7 @@ reading normally takes 600 ms. The firmware allows 1800 ms per transaction and
 requires the numeric response plus `*OK`.
 
 Initialization disables continuous output, enables acknowledgements, queries
-`i`, `K,?`, `T,?`, and `Cal,?`, then enables EC output and disables TDS, salinity,
+`i`, `Status`, `K,?`, `T,?`, and `Cal,?`, then enables EC output and disables TDS, salinity,
 and specific gravity. Firmware 0.1.1 matches the confirmed physical K10 probe:
 if K differs from 10 and `Cal,?` reports mode 0, it sends `K,10` and requires
 acknowledged K=10 readback. It attempts that write at most once per boot; an
@@ -56,6 +63,11 @@ Telemetry uses `clam/node_05/telemetry` and `clam/node_05/status`:
 | `calibration_status`, `compensation_status` | `UNVERIFIED` in this firmware |
 
 `sensor_status=OK` confirms acquisition and parsing, not calibration accuracy.
+Firmware 0.1.2 rejects EC above the K10 probe's documented 1 S/cm
+(1,000,000 µS/cm) upper range as `OUT_OF_RANGE`, with null conductivity and the
+raw response retained. Zero is preserved for diagnostics; it does not establish
+a valid tap-water measurement. The circuit's separate `500,000+` specification
+is not interpreted as an exact upper limit.
 Unsynchronized sample time remains null. There is no offline queue;
 `not_forwarded_before_sample` counts samples not forwarded, including while
 MQTT is disabled.
@@ -116,12 +128,20 @@ port, then upload in the same Mac terminal:
 ```
 
 If needed, press RESET once without BOOT to start the application. Expect
-`node_05`, firmware `0.1.1`, and `event=EC_CONFIG` showing the queried K,
+`node_05`, firmware `0.1.2`, and `event=EC_CONFIG` showing the queried K,
 compensation setting, and calibration mode. For K10, initialization should reach
 `event=EC_READY`; subsequent JSON should contain actual conductivity and
 `sensor_status=OK`. A timeout, wrong sensor, or configuration error must remain
 visible with null conductivity. Record the exact diagnostic before changing
 settings. `EC_K_CONFIGURING` and `EC_K_CONFIRMED` identify the guarded K10 setup. No calibration command interface is included.
+
+`event=EC_POWER response=?Status,P,3.300` is an example diagnostic, not a recorded
+value: `Status` queries EZO-side supply voltage and the last restart reason
+(`P` power cycle, `S` software reset, `B` brownout, `W` watchdog, `U` unknown).
+It does not change calibration. A normal voltage does not prove probe continuity
+or exclude intermittent power faults. If EC stays zero in water, preserve the
+raw logs and inspect the carrier, EZO module, probe connector, and trapped air
+before calibration. Disconnect power before reseating hardware.
 
 Check `event=STATUS` for the current station MAC, DHCP IP, and Wi-Fi connection.
 `mqtt=DISABLED` is expected until the account is configured. `clock_status`

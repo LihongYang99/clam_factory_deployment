@@ -12,11 +12,16 @@ int main() {
   double value = 0;
   auto reply = receive("\r\n1413.25\r\n*OK\r");
   assert(!reply.result(true));
-  assert(ezoec::conductivity(reply.data, value) && value == 1413.25);
+  assert(!ezoec::conductivity(reply.data, value) && value == 1413.25);
   assert(reply.count == strlen("\r\n1413.25\r\n*OK\r"));
-  assert(ezoec::conductivity("0", value) && value == 0);
+  assert(!ezoec::conductivity("0", value) && value == 0);
+  assert(!ezoec::conductivity("1000000", value) && value == 1000000);
+  for (const char* high : {"1000000.1", "3971000"})
+    assert(!strcmp(ezoec::conductivity(high, value), "OUT_OF_RANGE"));
   for (const char* bad : {"", "-1", "nan", "inf", "12x", "12,0.5", " ", ".", "1.2.3"})
-    assert(!ezoec::conductivity(bad, value));
+    assert(!strcmp(ezoec::conductivity(bad, value), "INVALID_READING"));
+  reply = receive("?Status,P,3.300\r*OK\r");
+  assert(!reply.result(true) && ezoec::startsWith(reply.data, "?Status,"));
   assert(!receive("*OK\r").result(false));
   assert(receive("*OK\r").result(true));
   assert(receive("1413\r").result(true));  // Missing acknowledgement is not success.
