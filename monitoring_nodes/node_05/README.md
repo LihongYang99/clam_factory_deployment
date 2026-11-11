@@ -9,16 +9,34 @@ MQTT is still disabled; broker delivery and the `.105` reservation remain pendin
 The 0.1.3 host tests and ESP32 build passed; upload hashes and the on-device
 version were verified. `CAL BEGIN` and `CAL STATUS` responded correctly, with
 USB readings continuing while the forwarding counter remained unchanged.
-Dry/low/high writes have not yet been exercised on hardware.
+The dry, 12,880 µS/cm low, and 150,000 µS/cm high writes each returned `*OK`
+on November 11, 2026. After the high write, `Cal,?` returned 2 and the firmware
+advanced to `next=VERIFY`; a separate status query confirmed the same result.
+Readings in the calibration cup were 148,900–149,400 µS/cm for about one minute.
+This confirms the acknowledged sequence and its immediate response, not an
+independent accuracy check. The first fresh low-standard recheck, reported at
+22°C, settled near 15,500 µS/cm, about 20% above the bottle's nominal 12,880.
+This comparison is not temperature-corrected and does not verify accuracy.
+A second fresh low aliquot in another clean cup after thorough rinsing instead
+settled at 11,190–11,210 µS/cm for about 95 seconds, with all responses OK and
+no setting changes. The first result was not reproduced; neither carryover nor
+another cause is established. Temperature confirmation for this replacement
+aliquot is pending before interpreting its offset or deciding on recalibration.
+A fresh high-standard recheck also remains pending. Calibration and compensation
+status remain `UNVERIFIED`.
 
 The circuit initially reported K=1 and calibration mode 0; firmware configured
-the confirmed physical K10 probe and read the setting back. The latest settings
-are K10, compensation 25°C, calibration mode 0, and EZO-side supply 3.87 V.
-After the operator retightened the **SMA threaded probe connector**, readings in
-undiluted 12,880 µS/cm standard changed from zero to approximately 8,400 µS/cm,
-with some drift. This is a response check, not verified measurement accuracy.
-No calibration writes have yet been confirmed. Both standards are available;
-the operator is preparing the dry probe for the procedure below.
+the confirmed physical K10 probe and read the setting back. Current settings
+are K10, compensation 25°C, and calibration mode 2. The last queried EZO-side
+supply was 3.87 V; this is the isolated sensor rail, not the host supply.
+
+Earlier checks included intermittent near-zero readings and manipulation of the
+**SMA threaded probe connector**. Before the high write, the low-standard response
+shifted from approximately 11,400 to 12,530–12,570 µS/cm without another low write;
+the cause remains unresolved. Fresh high standard subsequently gave a continuous
+nonzero response and settled near 95,000 µS/cm before its single calibration
+write. Keep connections unchanged for the independent rechecks. If they fail,
+resolve the measurement inconsistency and repeat the full physical procedure.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
 dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
