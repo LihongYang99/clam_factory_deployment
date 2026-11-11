@@ -7,6 +7,13 @@ let paused = false, pausedAt = 0, last = null, lastFetch = 0, failed = true, bus
 const snapshots = {}, fetchTimes = {}, fetchErrors = {};
 let predictionData = null, predictionFetchTime = 0, predictionFailed = false;
 const nodeFor = m => m.node.toLowerCase().replace(' ', '_');
+const addresses = {
+  router: '192.168.88.1', gateway: '192.168.88.250',
+  'Node 01': '192.168.88.101', 'Node 02': '192.168.88.102',
+  'Node 03': '192.168.88.103', 'Node 04': '192.168.88.104',
+  'Node 05': '192.168.88.105', 'Camera 06': '192.168.88.106',
+  'Node 07': '192.168.88.107'
+};
 const accuracy = {
   do: {delta:0.6, note:'±0.6 mg/L; ±3% of 20 mg/L full scale'},
   orp: {delta:5, note:'±5 mV; specified at 25°C in 222 mV standard'},
@@ -28,6 +35,7 @@ const temperatureMeasurements = measurements.filter(m => m.live && m.key === 'te
 const detailHref = m => m.id === 'temperature' ? '#temperature_do' : `#${m.id}`;
 let activeMeasurement = measurements.find(m => m.id === 'do');
 function setupNavigation() {
+  el('network-addresses').textContent = `Jetson / ${addresses.gateway}   Router / ${addresses.router}`;
   const nav = el('sensor-nav');
   nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a><a href="#predictions" class="nav-overview">Prediction dashboard</a>';
   for (const group of ['Chemical properties','Physical properties','Image information']) {
@@ -40,8 +48,11 @@ function setupNavigation() {
       const row=document.createElement('a'); row.href=detailHref(m); row.className='measurement-row';
       const label=document.createElement('span'); label.className='measurement-name'; label.textContent=m.id==='temperature'?'Temperature (DO probe)':m.name;
       const value=document.createElement('strong'); value.id=`value-${m.id}`; if(!m.live)value.className='not-integrated'; value.textContent=m.live?'—':'Not integrated';
+      const reading=document.createElement('span'); reading.className='measurement-reading';
+      const ip=document.createElement('span'); ip.className='device-ip'; ip.textContent=`${m.live?'IP':'Planned IP'}: ${addresses[m.node]}`;
+      reading.append(value,ip);
       const state=document.createElement('span'); state.id=`state-${m.id}`; state.className='measurement-state'; state.textContent=m.live?'Waiting for data':''; state.hidden=!m.live;
-      row.append(label,value,state); section.append(row);
+      row.append(label,reading,state); section.append(row);
     }
     el('overview-groups').append(section);
   }
@@ -52,7 +63,8 @@ function setupTemperatures() {
     const name = document.createElement('th'); name.scope = 'row';
     const link = document.createElement('a'); link.href = detailHref(m);
     link.textContent = `${m.probe} / ${m.node}`;
-    name.append(link); row.append(name);
+    const ip = document.createElement('span'); ip.className = 'device-ip'; ip.textContent = `IP: ${addresses[m.node]}`;
+    name.append(link, ip); row.append(name);
     for (const [prefix, label] of [['reading', 'Temperature'], ['reading-time', 'Last received'], ['reading-state', 'Average participation']]) {
       const cell = document.createElement('td'); cell.id = `${prefix}-${m.id}`; cell.dataset.label = label;
       cell.textContent = '—'; row.append(cell);
@@ -97,7 +109,7 @@ function setupPredictions() {
     name.scope = 'row';
     const link = document.createElement('a'); link.href = detailHref(m);
     link.textContent = m.id === 'orp' ? 'ORP' : m.id === 'temperature' ? 'Temperature (DO probe)' : m.name;
-    const source = document.createElement('span'); source.className = 'prediction-source'; source.textContent = m.node;
+    const source = document.createElement('span'); source.className = 'prediction-source'; source.textContent = `${m.node} / ${addresses[m.node]}`;
     name.append(link, source); row.append(name);
     for (const field of ['current', 'forecast', 'difference']) {
       const cell = document.createElement('td'); cell.dataset.label = {current:'Latest reading', forecast:'12h forecast', difference:'Difference'}[field];
@@ -165,7 +177,7 @@ function selectView() {
   el('overview').hidden=!overview; el('prediction-view').hidden=!prediction;
   el('temperature-view').hidden=!temperature;
   el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live;
-  el('view-subtitle').textContent=m?.node || '';
+  el('view-subtitle').textContent=m ? `${m.node}${m.live ? ' / IP: '+addresses[m.node] : ''}` : '';
   el('view-subtitle').hidden=!m || temperature;
   document.querySelector('.timestamp').hidden=prediction || temperature;
   const navId=temperature || m?.key==='temperature_c'?'temperature':overview?'overview':id;
@@ -184,7 +196,7 @@ function selectView() {
   } else if(m) {
     el('planned-title').textContent=m.name; el('planned-description').textContent=m.description;
     el('planned-facts').replaceChildren();
-    for(const [label,value] of [['Device',m.node],['Readings','Not available'],['History','Not available']]) {
+    for(const [label,value] of [['Device',m.node],['Planned IP',addresses[m.node]],['Readings','Not available'],['History','Not available']]) {
       const row=document.createElement('div'), dt=document.createElement('dt'), dd=document.createElement('dd');
       dt.textContent=label;dd.textContent=value;row.append(dt,dd);el('planned-facts').append(row);
     }

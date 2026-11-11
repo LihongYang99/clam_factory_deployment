@@ -3,11 +3,12 @@
 Use DHCP on each device and reserve its address in the MikroTik router.
 One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
 
-| Device | Address | Verification on 2026-11-04 |
+| Device | Address | Verification |
 | --- | --- | --- |
 | Router / WebFig | `192.168.88.1` | WebFig accessible |
 | Node 01 | `192.168.88.101` | Address and Active Address match after board reset |
-| Node 02–07 | `192.168.88.102`–`192.168.88.107` | Planned; slot 06 reserved for camera |
+| Node 02 | `192.168.88.102` | Confirmed in serial diagnostics on 2026-11-10 |
+| Node 03–07 | `192.168.88.103`–`192.168.88.107` | Planned; slot 06 reserved for camera |
 | Jetson Orin Nano | `192.168.88.250` | Owner confirmed `hostname -I` includes this address |
 
 ## Reserve an address

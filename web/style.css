@@ -254,10 +254,17 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
   body:has(#overview:not([hidden])) .sidebar h2 { margin: 8px 8px 4px; font-size: 14.5px; }
   body:has(#overview:not([hidden])) .sidebar a { padding: 6px 8px; margin-bottom: 2px; line-height: 1.2; }
   #overview .notice { margin: 8px 0 12px; padding: 8px 12px; }
-  #overview .measurement-row { padding: 8px; }
+  #overview .measurement-row { padding: 4px 8px; }
 }
 
 .measurement-row strong.not-integrated { color: #b42318; }
+.header-network { min-width: 0; text-align: right; }
+#network-addresses { margin: 4px 0 0; font-size: 14px; white-space: pre-wrap; }
+.device-ip { display: block; font-size: 14px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.measurement-reading { text-align: right; }
+@media (max-width: 760px) {
+  .measurement-reading, .header-network { text-align: left; }
+}
 
 /* Compare temperature modules while retaining each probe's source and quality. */
 body:has(#temperature-view:not([hidden])) .workspace main { margin-block: 0; }

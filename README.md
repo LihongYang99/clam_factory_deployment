@@ -132,7 +132,7 @@ use DHCP.
 | Device | Reserved / planned address | Status |
 | --- | --- | --- |
 | Node 01 | `192.168.88.101` | Active lease verified in WebFig after board reset (2026-11-04) |
-| Node 02 | `192.168.88.102` | Planned |
+| Node 02 | `192.168.88.102` | Confirmed in serial diagnostics (2026-11-10) |
 | Node 03 | `192.168.88.103` | Planned |
 | Node 04 | `192.168.88.104` | Planned |
 | Node 05 | `192.168.88.105` | Planned |

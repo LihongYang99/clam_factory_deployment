@@ -51,10 +51,20 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#sensor-nav a[href="#do"]')).to_have_css('font-size', '14.5px')
                 expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '18.5px')
                 expect(page.locator('#value-ph')).to_have_css('color', 'rgb(180, 35, 24)')
+                expect(page.locator('#network-addresses')).to_contain_text('192.168.88.1')
+                expect(page.locator('#network-addresses')).to_contain_text('192.168.88.250')
+                for measurement, suffix in [('do', 101), ('temperature', 101), ('orp', 102), ('temperature_orp', 102),
+                                            ('ph', 103), ('turbidity', 104), ('conductivity', 105), ('camera', 106), ('uv254', 107)]:
+                    address = page.locator('.measurement-reading').filter(has=page.locator(f'#value-{measurement}')).locator('.device-ip')
+                    expect(address).to_have_text(f'{"IP" if suffix < 103 else "Planned IP"}: 192.168.88.{suffix}')
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 if width > 760:
-                    assert page.evaluate('document.documentElement.scrollHeight <= innerHeight'), 'Overview should fit desktop height'
+                    height = page.evaluate('document.documentElement.scrollHeight')
+                    viewport_height = page.evaluate('innerHeight')
+                    if height > viewport_height:
+                        page.screenshot(path=str(output/f'overview-overflow-{width}.png'), full_page=True)
+                    assert height <= viewport_height, f'Overview height {height}px exceeds {viewport_height}px at width {width}px'
                 page.screenshot(path=str(output/f'overview-{width}.png'), full_page=True)
                 page.locator('#sensor-nav a[href="#temperature"]').click()
                 expect(page.locator('#temperature-view')).to_be_visible()
@@ -62,6 +72,8 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#temperature-count')).to_have_text('2 of 2 probes')
                 expect(page.locator('#reading-temperature')).to_contain_text('25.32')
                 expect(page.locator('#reading-temperature_orp')).to_contain_text('23.40')
+                expect(page.locator('#temperature-row-temperature .device-ip')).to_have_text('IP: 192.168.88.101')
+                expect(page.locator('#temperature-row-temperature_orp .device-ip')).to_have_text('IP: 192.168.88.102')
                 expect(page.locator('#sensor-nav a[href="#temperature_orp"]')).to_have_count(0)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 page.evaluate('window.scrollTo(0, 0)')
@@ -73,11 +85,13 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#chart-title')).to_have_text('Temperature history')
                 expect(page.locator('#temperature-source')).to_be_visible()
                 expect(page.locator('#temperature-source')).to_have_text('Source: Node 01 / DO probe')
+                expect(page.locator('#view-subtitle')).to_contain_text('192.168.88.101')
                 expect(page.locator('#sensor-nav a[href="#temperature"]')).to_have_attribute('aria-current', 'page')
                 assert '25.32 °C' in page.locator('#chart title').first.text_content()
                 page.locator('#sensor-nav a[href="#temperature"]').click()
                 page.locator('#temperature-view a[href="#temperature_orp"]').click()
                 expect(page.locator('#temperature-source')).to_have_text('Source: Node 02 / ORP probe')
+                expect(page.locator('#view-subtitle')).to_contain_text('192.168.88.102')
                 expect(page.locator('#chart title').first).to_contain_text('23.40 °C')
                 expect(page.locator('#sensor-nav a[href="#temperature"]')).to_have_attribute('aria-current', 'page')
                 page.locator('#sensor-nav a[href="#do"]').click()
@@ -133,6 +147,9 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#prediction-difference-do')).to_have_text('-0.27 mg/L')
                 expect(page.locator('#prediction-difference-orp')).to_have_text('+25.00 mV')
                 expect(page.locator('#prediction-forecast-temperature_orp')).to_have_text('—')
+                for measurement, suffix in [('do', 101), ('orp', 102), ('temperature_do', 101), ('temperature_orp', 102)]:
+                    source = page.locator('#prediction-rows tr').filter(has=page.locator(f'a[href="#{measurement}"]')).locator('.prediction-source:not([id])')
+                    expect(source).to_contain_text(f'192.168.88.{suffix}')
                 expect(page.locator('.prediction-table thead th').nth(1)).to_have_text('Latest reading')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 page.evaluate('window.scrollTo(0, 0)')
@@ -150,9 +167,11 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#prediction-difference-do')).to_have_text('—')
                 page.locator('#prediction-pause').click()
                 expect(page.locator('#prediction-status')).to_have_text('Latest LSTM predictions')
-                for name in ['turbidity', 'conductivity', 'ph', 'uv254', 'camera']:
+                for name, suffix in [('turbidity', 104), ('conductivity', 105), ('ph', 103), ('uv254', 107), ('camera', 106)]:
                     page.locator(f'#sensor-nav a[href="#{name}"]').click()
                     expect(page.locator('#planned-view')).to_be_visible()
+                    expect(page.locator('#planned-facts')).to_contain_text('Planned IP')
+                    expect(page.locator('#planned-facts')).to_contain_text(f'192.168.88.{suffix}')
                     assert page.locator('#live-detail').is_hidden()
                 page.go_back()
                 expect(page.locator('#planned-title')).to_have_text('UV254 / optical COD proxy')

@@ -50,6 +50,13 @@ Other entries describe planned devices and never display invented readings or
 camera images. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
 
+The header lists the configured Jetson and router IPs. Measurement rows, probe
+details, temperature comparison and prediction sources show the owning node's
+IP. Temperature modules share their probe node's address. Unintegrated devices
+are labeled **Planned IP**, including the camera. These addresses come from the
+project's LAN plan in `web/app.js`, not live network discovery; telemetry status
+is separate. Update the address map if router reservations change.
+
 ## Prediction dashboard
 
 Select **Prediction dashboard** beside Overview to compare the latest measured
@@ -102,9 +109,9 @@ Pause display freezes the displayed readings and mean until resumed.
 `#temperature` opens the comparison; `#temperature_do` and `#temperature_orp`
 open the existing individual histories. When integrating another temperature
 module, add a live measurement with `key: 'temperature_c'`, a unique ID, the
-`Node NN` source and `probe` label in `web/app.js`, and implement its gateway API
-as part of node integration. It then joins the comparison and average
-automatically; unintegrated nodes are not included.
+`Node NN` source and `probe` label in `web/app.js`. Add its reserved IP to the
+address map and implement its gateway API as part of node integration. It then
+joins the comparison and average automatically; unintegrated nodes are not included.
 
 ## Manufacturer specification shading
 
