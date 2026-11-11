@@ -39,8 +39,8 @@ the gateway when adding or changing the image route.
 
 ## Worker overview and measurement navigation
 
-The default view is an overview grouped into Physical properties, Chemical
-properties, and Image information. The left navigation opens each measurement;
+The overview and left navigation list Chemical properties first, followed by
+Physical properties and Image information. The left navigation opens each measurement;
 on small screens it becomes a horizontally scrollable navigation strip.
 Temperature and DO use the same Node 01 telemetry, with separate trend units.
 Other entries describe planned devices and never display invented readings or

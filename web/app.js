@@ -27,7 +27,7 @@ let activeMeasurement = measurements.find(m => m.id === 'do');
 function setupNavigation() {
   const nav = el('sensor-nav');
   nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a>';
-  for (const group of ['Physical properties','Chemical properties','Image information']) {
+  for (const group of ['Chemical properties','Physical properties','Image information']) {
     const heading = document.createElement('h2'); heading.textContent=group; nav.append(heading);
     const section=document.createElement('section'); section.className='measurement-group';
     const title=document.createElement('h3'); title.textContent=group; section.append(title);
