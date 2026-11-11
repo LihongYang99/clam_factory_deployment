@@ -35,8 +35,21 @@ static-file changes.
 The header uses the owner-provided horizontal BSE logo at
 `gateway/images/vt-bse-logo.png`, unchanged and at its original aspect ratio.
 It is served locally through `/vt-bse-logo.png` and displayed on a light panel
-for legibility. Sync `web/`, `gateway/images/`, and `gateway/app.py`, then restart
-the gateway when adding or changing the image route.
+for legibility. Beside it, the owner-provided company logo is stored unchanged
+at `web/logo/Bumble Bee Seafood Company Logo.png` and served through
+`/bumble-bee-logo.png`. Both images keep their original aspect ratios; the
+header wraps on narrow screens.
+
+Adding this company logo also adds a gateway image route. Sync the frontend and
+server, then restart the gateway so the image loads:
+
+```bash
+rsync -av web lihong@192.168.88.250:~/clam_factory_deployment/
+rsync -av gateway/app.py lihong@192.168.88.250:~/clam_factory_deployment/gateway/
+ssh -t lihong@192.168.88.250 'sudo systemctl restart clam-gateway && systemctl is-active clam-gateway'
+```
+
+If changing the VT image, also sync `gateway/images/`.
 
 ## Worker overview and measurement navigation
 

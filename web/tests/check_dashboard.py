@@ -54,6 +54,7 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('header')).not_to_contain_text('192.168.88.')
                 expect(page.locator('#overview')).not_to_contain_text('192.168.88.')
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
+                assert page.locator('.company-logo').evaluate('(e)=>e.complete && e.naturalWidth === 1478')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 if width > 760:
                     height = page.evaluate('document.documentElement.scrollHeight')

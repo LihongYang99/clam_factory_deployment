@@ -9,7 +9,7 @@ from urllib.request import urlopen
 from urllib.error import HTTPError
 from http.server import ThreadingHTTPServer
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app import Store, handler_for, validate
+from app import ROOT, Store, handler_for, validate
 
 SAMPLE = dict(schema_version=1, node_id='node_01', boot_id='3b65b0a7f176469f', sequence=33,
               uptime_ms=161002, not_forwarded_before_sample=27, sensor_status='OK',
@@ -51,9 +51,14 @@ class Tests(unittest.TestCase):
             try:
                 with urlopen(base+'/api/node_01') as response:
                     self.assertIsNone(json.load(response)['latest'])
-                for path in ('/','/app.js','/style.css','/vt-bse-logo.png'):
+                for path in ('/','/app.js','/style.css','/vt-bse-logo.png','/bumble-bee-logo.png'):
                     with urlopen(base+path) as response:self.assertEqual(response.status,200)
-                for path,code in [('/api/node_01?minutes=999',400),('/gateway/.env',404),('/../README.md',404)]:
+                with urlopen(base+'/bumble-bee-logo.png') as response:
+                    self.assertEqual(response.headers['Content-Type'], 'image/png')
+                    image = response.read()
+                    self.assertEqual(image[:8], b'\x89PNG\r\n\x1a\n')
+                    self.assertEqual(image, (ROOT/'web/logo/Bumble Bee Seafood Company Logo.png').read_bytes())
+                for path,code in [('/api/node_01?minutes=999',400),('/gateway/.env',404),('/../README.md',404),('/web/logo/Bumble%20Bee%20Seafood%20Company%20Logo.png',404)]:
                     with self.assertRaises(HTTPError) as error:urlopen(base+path)
                     self.assertEqual(error.exception.code,code)
             finally:server.shutdown();server.server_close();thread.join()
