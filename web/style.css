@@ -254,16 +254,28 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
   body:has(#overview:not([hidden])) .sidebar h2 { margin: 8px 8px 4px; font-size: 14.5px; }
   body:has(#overview:not([hidden])) .sidebar a { padding: 6px 8px; margin-bottom: 2px; line-height: 1.2; }
   #overview .notice { margin: 8px 0 12px; padding: 8px 12px; }
-  #overview .measurement-row { padding: 4px 8px; }
+  #overview .measurement-row { padding: 8px 8px; }
 }
 
 .measurement-row strong.not-integrated { color: #b42318; }
-.header-network { min-width: 0; text-align: right; }
-#network-addresses { margin: 4px 0 0; font-size: 14px; white-space: pre-wrap; }
 .device-ip { display: block; font-size: 14px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.measurement-reading { text-align: right; }
+
+/* One address record per board; temperature modules share their probe node. */
+body:has(#network-view:not([hidden])) .workspace main { margin-block: 0; }
+#network-heading { margin: 24px 0 16px; font-size: 28px; }
+.network-table { font-size: 16px; }
+.network-table caption { padding: 0 0 16px; }
+.network-table th, .network-table td { padding: 14px 12px; }
+.network-table th[scope="row"] { color: var(--text); font-weight: 600; white-space: normal; }
+.network-role { display: block; margin-top: 2px; font-size: 14px; font-weight: 400; color: var(--muted); }
 @media (max-width: 760px) {
-  .measurement-reading, .header-network { text-align: left; }
+  .network-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .network-table, .network-table tbody, .network-table caption { display: block; }
+  .network-table tr { display: block; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .network-table th, .network-table td { display: block; padding: 4px 0; border: 0; }
+  .network-table th[scope="row"] { padding-bottom: 8px; }
+  .network-table td { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; overflow-wrap: anywhere; white-space: normal; }
+  .network-table td::before { content: attr(data-label); color: var(--muted); }
 }
 
 /* Compare temperature modules while retaining each probe's source and quality. */

@@ -51,12 +51,8 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#sensor-nav a[href="#do"]')).to_have_css('font-size', '14.5px')
                 expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '18.5px')
                 expect(page.locator('#value-ph')).to_have_css('color', 'rgb(180, 35, 24)')
-                expect(page.locator('#network-addresses')).to_contain_text('192.168.88.1')
-                expect(page.locator('#network-addresses')).to_contain_text('192.168.88.250')
-                for measurement, suffix in [('do', 101), ('temperature', 101), ('orp', 102), ('temperature_orp', 102),
-                                            ('ph', 103), ('turbidity', 104), ('conductivity', 105), ('camera', 106), ('uv254', 107)]:
-                    address = page.locator('.measurement-reading').filter(has=page.locator(f'#value-{measurement}')).locator('.device-ip')
-                    expect(address).to_have_text(f'{"IP" if suffix < 103 else "Planned IP"}: 192.168.88.{suffix}')
+                expect(page.locator('header')).not_to_contain_text('192.168.88.')
+                expect(page.locator('#overview')).not_to_contain_text('192.168.88.')
                 assert page.locator('.vt-logo').evaluate('(e)=>e.complete && e.naturalWidth > 0')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 if width > 760:
@@ -66,6 +62,40 @@ with tempfile.TemporaryDirectory() as folder:
                         page.screenshot(path=str(output/f'overview-overflow-{width}.png'), full_page=True)
                     assert height <= viewport_height, f'Overview height {height}px exceeds {viewport_height}px at width {width}px'
                 page.screenshot(path=str(output/f'overview-{width}.png'), full_page=True)
+                network_link = page.locator('#sensor-nav a[href="#network"]')
+                expect(network_link).to_have_text('IP & MAC')
+                network_link.click()
+                expect(network_link).to_have_attribute('aria-current', 'page')
+                expect(page.locator('#network-view')).to_be_visible()
+                expect(page.locator('#network-view thead th')).to_have_text(['Device', 'IP address', 'MAC address', 'Assignment'])
+                expect(page.locator('#network-rows tr')).to_have_count(9)
+                for name, suffix, mac, assignment in [
+                    ('Router', 1, 'Not recorded', 'Configured'),
+                    ('Jetson Orin Nano', 250, 'AC:3A:E2:AB:F6:AC', 'Configured'),
+                    ('Node 01', 101, '64:E8:33:75:BB:4C', 'Configured'),
+                    ('Node 02', 102, '30:30:F9:3B:81:B4', 'Configured'),
+                    ('Node 03', 103, 'Not assigned', 'Planned'),
+                    ('Node 04', 104, 'Not assigned', 'Planned'),
+                    ('Node 05', 105, 'Not assigned', 'Planned'),
+                    ('Camera 06', 106, 'Not assigned', 'Planned'),
+                    ('Node 07', 107, 'Not assigned', 'Planned'),
+                ]:
+                    row = page.locator('#network-rows tr').filter(has_text=name)
+                    expect(row).to_have_count(1)
+                    for value in (f'192.168.88.{suffix}', mac, assignment):
+                        expect(row).to_contain_text(value)
+                expect(page.locator('#network-rows').get_by_text('Planned', exact=True)).to_have_count(5)
+                for selector in ('#overview', '#live-detail', '#planned-view', '#temperature-view', '#prediction-view', '.timestamp'):
+                    expect(page.locator(selector)).to_be_hidden()
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.evaluate('window.scrollTo(0, 0)')
+                page.mouse.move(min(width-10, 600), 10)
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(output/f'network-{width}.png'), full_page=True)
+                page.go_back()
+                expect(page.locator('#overview')).to_be_visible()
+                expect(page.locator('#network-view')).to_be_hidden()
+                expect(page.locator('.timestamp')).to_be_visible()
                 page.locator('#sensor-nav a[href="#temperature"]').click()
                 expect(page.locator('#temperature-view')).to_be_visible()
                 expect(page.locator('#temperature-average')).to_have_text('24.36')
@@ -279,4 +309,4 @@ with tempfile.TemporaryDirectory() as folder:
     finally:
         server.shutdown()
         server.server_close()
-print('PASS: responsive overview, temperature mean/eligibility/history/pause, sensor routing/history, prediction routing/units/states, planned devices, stale, empty, API failure.')
+print('PASS: responsive overview, IP & MAC registry/routing, temperature mean/eligibility/history/pause, sensor routing/history, prediction routing/units/states, planned devices, stale, empty, API failure.')

@@ -50,12 +50,17 @@ Other entries describe planned devices and never display invented readings or
 camera images. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
 
-The header lists the configured Jetson and router IPs. Measurement rows, probe
-details, temperature comparison and prediction sources show the owning node's
-IP. Temperature modules share their probe node's address. Unintegrated devices
-are labeled **Planned IP**, including the camera. These addresses come from the
-project's LAN plan in `web/app.js`, not live network discovery; telemetry status
-is separate. Update the address map if router reservations change.
+Select **IP & MAC** in the sidebar (`#network`) for the router, Jetson and node
+address registry. Overview and the header keep addresses out of the readings.
+The registry distinguishes configured from planned IPs and labels unknown MACs
+as **Not recorded** or **Not assigned**. Jetson's listed MAC is its Ethernet
+interface; Node 01 and Node 02 use their Wi-Fi MACs. Temperature modules share
+their probe node's address, so each board appears once.
+
+These are recorded LAN assignments, not live discovery or connection status.
+Maintain the `addresses` map and `setupNetwork()` device records in `web/app.js`
+when hardware or router reservations change. Probe details, temperature
+comparison and prediction sources retain their source IPs for troubleshooting.
 
 ## Prediction dashboard
 

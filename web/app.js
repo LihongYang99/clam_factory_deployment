@@ -35,9 +35,8 @@ const temperatureMeasurements = measurements.filter(m => m.live && m.key === 'te
 const detailHref = m => m.id === 'temperature' ? '#temperature_do' : `#${m.id}`;
 let activeMeasurement = measurements.find(m => m.id === 'do');
 function setupNavigation() {
-  el('network-addresses').textContent = `Jetson / ${addresses.gateway}   Router / ${addresses.router}`;
   const nav = el('sensor-nav');
-  nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a><a href="#predictions" class="nav-overview">Prediction dashboard</a>';
+  nav.innerHTML = '<a href="#overview" class="nav-overview">Overview</a><a href="#predictions" class="nav-overview">Prediction dashboard</a><a href="#network" class="nav-overview">IP &amp; MAC</a>';
   for (const group of ['Chemical properties','Physical properties','Image information']) {
     const heading = document.createElement('h2'); heading.textContent=group; nav.append(heading);
     const section=document.createElement('section'); section.className='measurement-group';
@@ -48,13 +47,33 @@ function setupNavigation() {
       const row=document.createElement('a'); row.href=detailHref(m); row.className='measurement-row';
       const label=document.createElement('span'); label.className='measurement-name'; label.textContent=m.id==='temperature'?'Temperature (DO probe)':m.name;
       const value=document.createElement('strong'); value.id=`value-${m.id}`; if(!m.live)value.className='not-integrated'; value.textContent=m.live?'—':'Not integrated';
-      const reading=document.createElement('span'); reading.className='measurement-reading';
-      const ip=document.createElement('span'); ip.className='device-ip'; ip.textContent=`${m.live?'IP':'Planned IP'}: ${addresses[m.node]}`;
-      reading.append(value,ip);
       const state=document.createElement('span'); state.id=`state-${m.id}`; state.className='measurement-state'; state.textContent=m.live?'Waiting for data':''; state.hidden=!m.live;
-      row.append(label,reading,state); section.append(row);
+      row.append(label,value,state); section.append(row);
     }
     el('overview-groups').append(section);
+  }
+}
+function setupNetwork() {
+  const devices = [
+    {key:'router', name:'Router', role:'MikroTik / WebFig'},
+    {key:'gateway', name:'Jetson Orin Nano', role:'Gateway / Ethernet', mac:'AC:3A:E2:AB:F6:AC'},
+    {key:'Node 01', role:'DO / Temperature', mac:'64:E8:33:75:BB:4C'},
+    {key:'Node 02', role:'ORP / Temperature', mac:'30:30:F9:3B:81:B4'},
+    {key:'Node 03', role:'pH', planned:true},
+    {key:'Node 04', role:'Turbidity', planned:true},
+    {key:'Node 05', role:'Electrical conductivity', planned:true},
+    {key:'Camera 06', role:'RGB camera', planned:true},
+    {key:'Node 07', role:'UV254 / Optical COD proxy', planned:true}
+  ];
+  for (const device of devices) {
+    const row = document.createElement('tr'), name = document.createElement('th');
+    name.scope = 'row'; name.textContent = device.name || device.key;
+    const role = document.createElement('span'); role.className = 'network-role'; role.textContent = device.role;
+    name.append(role); row.append(name);
+    for (const [label, value] of [['IP address', addresses[device.key]], ['MAC address', device.mac || (device.planned ? 'Not assigned' : 'Not recorded')], ['Assignment', device.planned ? 'Planned' : 'Configured']]) {
+      const cell = document.createElement('td'); cell.dataset.label = label; cell.textContent = value; row.append(cell);
+    }
+    el('network-rows').append(row);
   }
 }
 function setupTemperatures() {
@@ -173,13 +192,14 @@ function positionNavIndicator(animate = false) {
 function selectView() {
   const id=location.hash.slice(1) || 'overview';
   const m=measurements.find(m=>m.id===(id==='temperature_do'?'temperature':id));
-  const temperature=id==='temperature', prediction=id==='predictions', overview=!m && !prediction && !temperature;
+  const temperature=id==='temperature', prediction=id==='predictions', network=id==='network', overview=!m && !prediction && !temperature && !network;
   el('overview').hidden=!overview; el('prediction-view').hidden=!prediction;
+  el('network-view').hidden=!network;
   el('temperature-view').hidden=!temperature;
   el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live;
   el('view-subtitle').textContent=m ? `${m.node}${m.live ? ' / IP: '+addresses[m.node] : ''}` : '';
   el('view-subtitle').hidden=!m || temperature;
-  document.querySelector('.timestamp').hidden=prediction || temperature;
+  document.querySelector('.timestamp').hidden=prediction || temperature || network;
   const navId=temperature || m?.key==='temperature_c'?'temperature':overview?'overview':id;
   for(const a of el('sensor-nav').querySelectorAll('a')) {
     if(a.hash===`#${navId}`) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
@@ -215,6 +235,7 @@ function updateOverview() {
   el('overview-status').textContent='Calibration and compensation remain unverified. Each measurement shows its own connection status.';
 }
 setupNavigation();
+setupNetwork();
 setupTemperatures();
 setupPredictions();
 selectView();

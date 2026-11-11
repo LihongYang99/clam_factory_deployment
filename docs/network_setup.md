@@ -28,8 +28,9 @@ One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
 7. Refresh **Leases**. Confirm the correct MAC and that **Address** and
    **Active Address** both show the intended IP.
 
-Keep MAC addresses and device-specific observations in the local commissioning
-record. Firmware stays on DHCP; changing this reservation requires no reflashing.
+Update the dashboard's **IP & MAC** registry in `web/app.js` after confirming a
+reservation. Keep detailed observations in the local commissioning record.
+Firmware stays on DHCP; changing this reservation requires no reflashing.
 
 ## Why reset?
 

@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clam processing water quality dashboard</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body>
 <a class="skip-link" href="#main">Skip to readings</a>
-<header><div class="header-identity"><img class="vt-logo" src="/vt-bse-logo.png" alt="Virginia Tech Biological Systems Engineering — College of Engineering and College of Agriculture and Life Sciences" width="768" height="127"><a href="/" class="brand" aria-label="Clam monitoring home"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21C8 18 2 13 2 8a10 7 0 0 1 20 0c0 5-6 10-10 13ZM12 20V3M12 20 6 5M12 20l6-15"/></svg> clam</a></div><div class="header-network"><span id="connection" role="status">Connecting to gateway…</span><p id="network-addresses"></p></div></header>
+<header><div class="header-identity"><img class="vt-logo" src="/vt-bse-logo.png" alt="Virginia Tech Biological Systems Engineering — College of Engineering and College of Agriculture and Life Sciences" width="768" height="127"><a href="/" class="brand" aria-label="Clam monitoring home"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21C8 18 2 13 2 8a10 7 0 0 1 20 0c0 5-6 10-10 13ZM12 20V3M12 20 6 5M12 20l6-15"/></svg> clam</a></div><span id="connection" role="status">Connecting to gateway…</span></header>
 <div class="workspace">
 <aside class="sidebar"><nav aria-label="Monitoring navigation" id="sensor-nav"></nav></aside>
 <main id="main" tabindex="-1">
@@ -13,6 +13,10 @@
 <p id="overview-status" class="notice" role="status">Waiting for gateway data…</p>
 <div id="overview-groups"></div>
 <p class="overview-footnote">Operating limits not configured.</p>
+</section>
+<section id="network-view" hidden aria-labelledby="network-heading">
+<h2 id="network-heading">IP &amp; MAC</h2>
+<div class="table-scroll"><table class="network-table"><caption>Recorded LAN addresses. Assignment does not indicate connection status.</caption><thead><tr><th scope="col">Device</th><th scope="col">IP address</th><th scope="col">MAC address</th><th scope="col">Assignment</th></tr></thead><tbody id="network-rows"></tbody></table></div>
 </section>
 <section id="temperature-view" hidden aria-labelledby="temperature-heading">
 <div class="temperature-heading"><h2 id="temperature-heading">Temperature</h2><button id="temperature-pause" type="button" aria-pressed="false">Pause display</button></div>
