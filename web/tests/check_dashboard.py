@@ -49,7 +49,7 @@ with tempfile.TemporaryDirectory() as folder:
                 page.wait_for_function("document.querySelector('#value-do').textContent === '6.18 mg/L'")
                 assert page.locator('#overview').is_visible()
                 expect(page.locator('#sensor-nav a[href="#do"]')).to_have_css('font-size', '14.5px')
-                expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '18.5px')
+                expect(page.locator('#sensor-nav a[href="#overview"]')).to_have_css('font-size', '16px')
                 expect(page.locator('#value-ph')).to_have_css('color', 'rgb(180, 35, 24)')
                 expect(page.locator('header')).not_to_contain_text('192.168.88.')
                 expect(page.locator('#overview')).not_to_contain_text('192.168.88.')
