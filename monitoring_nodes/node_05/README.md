@@ -6,10 +6,16 @@ flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.3` adds
 explicit USB calibration commands. UART acquisition,
 Wi-Fi at temporary DHCP address `192.168.88.97`, and NTP synchronization are verified.
 MQTT is still disabled; broker delivery and the `.105` reservation remain pending.
+After the operator returned the probe to an ordinary water sample, `CAL END`
+resumed acquisition. A fresh query confirmed mode OFF with stored EZO calibration
+mode 2; this does not establish accuracy. That sample returned 0–4.82 µS/cm,
+with its water type and temperature unrecorded. On November 11, the live Jetson
+EC endpoint still returned HTTP 404, and the local Node 05 MQTT password was
+empty. Gateway deployment and account configuration are the next steps.
 The 0.1.3 host tests and ESP32 build passed; upload hashes and the on-device
 version were verified. `CAL BEGIN` and `CAL STATUS` responded correctly, with
 USB readings continuing while the forwarding counter remained unchanged.
-The dry, 12,880 µS/cm low, and 150,000 µS/cm high writes each returned `*OK`
+The first dry, 12,880 µS/cm low, and 150,000 µS/cm high writes each returned `*OK`
 on November 11, 2026. After the high write, `Cal,?` returned 2 and the firmware
 advanced to `next=VERIFY`; a separate status query confirmed the same result.
 Readings in the calibration cup were 148,900–149,400 µS/cm for about one minute.
@@ -22,15 +28,40 @@ settled at 11,190–11,210 µS/cm for about 95 seconds, with all responses OK an
 no setting changes. The operator confirmed this replacement aliquot was also
 approximately 22°C. The first result was not reproduced; neither carryover nor
 another cause is established. Accuracy has not been verified.
-Plan one controlled repeat of the complete dry/low/high sequence with connections
-unchanged and, if practical, both standards stabilized at their 25°C reference
-temperature. This temperature choice simplifies verification; it is not a claim
-that Atlas prohibits calibration at 22°C. Preparation and the repeat are pending.
-Calibration and compensation status remain `UNVERIFIED`.
+One controlled repeat has now completed its acknowledged writes with connections
+unchanged. The operator
+confirmed complete physical dryness and can maintain standards near 22°C.
+The repeat dry command returned `*OK`, advancing to `next=LOW`; subsequent air
+readings ranged from 0 to 4.92 µS/cm. The repeat low write also returned `*OK`
+in fresh standard reported at 22.3°C, advancing to `next=HIGH`. Before writing,
+recent readings were 12,530–12,550 µS/cm; afterward they were 12,860–12,900.
+The high write was initially withheld during sustained upward drift. After the
+operator reported the high liquid held at 23.5°C, readings settled to
+161,000–161,500 µS/cm over the final 70 seconds, with a small residual upward
+trend. One HIGH command returned `*OK`, advancing to VERIFY; a separate status
+query confirmed calibration mode 2 and the completed sequence. The next 80 seconds
+in the same cup ranged from 149,000 to 149,900 µS/cm. These immediate readings
+do not verify accuracy. A subsequent read-only low-standard recheck initially
+returned 0–6.44 µS/cm, then recovered during an immersion/bubble check. The last
+30 seconds ranged from 13,400 to 13,460 µS/cm, with a small upward trend (about
+4.0–4.5% above the nominal 12,880). Its actual liquid temperature was not measured,
+so this is not a temperature-corrected accuracy result. The cause of the near-zero
+response is unresolved. No point commands were repeated during the check; a
+separate fresh high-standard recheck is still outstanding. Keep accuracy unverified
+and investigate persistent discrepancies before further calibration writes.
+The EZO compensation setting stays at 25°C during calibration. Actual liquid
+temperatures will be recorded separately; same-temperature rechecks do not by
+themselves establish temperature-corrected accuracy. Calibration and compensation
+status remain `UNVERIFIED`.
 
 The circuit initially reported K=1 and calibration mode 0; firmware configured
 the confirmed physical K10 probe and read the setting back. Current settings
-are K10, compensation 25°C, and calibration mode 2. The last queried EZO-side
+are K10 and compensation 25°C. Reported calibration mode changed from 0 after
+the repeat dry write to 2 after the repeat low write, before any new high write.
+That intermediate behavior did not establish completion. The subsequent HIGH
+write was acknowledged, but independent standard checks remain required.
+No assumption is made about
+whether previous wet coefficients were retained. The last queried EZO-side
 supply was 3.87 V; this is the isolated sensor rail, not the host supply.
 
 Earlier checks included intermittent near-zero readings and manipulation of the
@@ -38,8 +69,9 @@ Earlier checks included intermittent near-zero readings and manipulation of the
 shifted from approximately 11,400 to 12,530–12,570 µS/cm without another low write;
 the cause remains unresolved. Fresh high standard subsequently gave a continuous
 nonzero response and settled near 95,000 µS/cm before its single calibration
-write. Keep connections unchanged for the independent rechecks. If they fail,
-resolve the measurement inconsistency and repeat the full physical procedure.
+write. Keep connections unchanged for the independent rechecks. If the controlled
+repeat's checks still disagree, investigate the standards and measurement path
+before further calibration writes.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
 dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
@@ -204,7 +236,10 @@ Do not paste the complete calibration sequence at once.
 3. **Low point.** Put the dry probe into fresh 12,880 µS/cm standard. Wait until
    readings stabilize, then send `CAL LOW 12880 CONFIRM`.
    Expect `command=Cal,low,12880 result=ACK` and `next=HIGH`.
-   **The low-point write does not immediately change readings.**
+   Atlas's illustrated sequence shows no immediate change after LOW. In this
+   project's repeat calibration, LOW did change readings and report mode 2.
+   Neither a changed value nor mode 2 at this stage replaces the required HIGH
+   step; follow the acknowledged firmware sequence.
 4. **High point.** Rinse with DI water and shake off excess. Immerse in fresh
    150,000 µS/cm standard and wait until stable. Send `CAL HIGH 150000 CONFIRM`.
    Expect `command=Cal,high,150000 result=ACK`, `next=VERIFY`, `cal_mode=2`,
@@ -246,9 +281,17 @@ The existing broker is `192.168.88.250:1883`. First sync the gateway, dashboard,
 and ACL from the **Mac**, preserving the Jetson's private `.env`:
 
 ```bash
-rsync -av --exclude='.env' --exclude='__pycache__/' gateway web lihong@192.168.88.250:~/clam_factory_deployment/
+cd /Users/lihongyang/Documents/clam_factory_deployment
+rsync -avR gateway/app.py gateway/mosquitto/clam.acl \
+  gateway/images/vt-bse-logo.png web/index.html web/app.js web/style.css \
+  'web/logo-company-VT/Bumble Bee Seafood Company Logo.png' \
+  lihong@192.168.88.250:~/clam_factory_deployment/
 ssh lihong@192.168.88.250
 ```
+
+This explicit file list leaves the Jetson's credentials, telemetry database,
+prediction results, and Python environment untouched. Enter the Jetson login
+password when SSH prompts for it; do not put it in the command or chat.
 
 Now run on the **Jetson**. Add the dedicated account to the existing password
 file; do **not** add `-c`, which would replace the file and its other accounts.
@@ -260,6 +303,15 @@ cd ~/clam_factory_deployment
 sudo mosquitto_passwd /etc/mosquitto/clam.passwd clam_node_05
 sudo chown root:mosquitto /etc/mosquitto/clam.passwd
 sudo chmod 640 /etc/mosquitto/clam.passwd
+sudo cat /etc/mosquitto/clam.acl
+cat gateway/mosquitto/clam.acl
+```
+
+Compare the active and staged ACLs before installation. The staged file includes
+Nodes 01, 02, 05, and the gateway; preserve any additional active account rules
+before replacing it. Then run:
+
+```bash
 sudo install -o root -g mosquitto -m 640 gateway/mosquitto/clam.acl /etc/mosquitto/clam.acl
 sudo systemctl restart mosquitto clam-gateway
 systemctl is-active mosquitto clam-gateway

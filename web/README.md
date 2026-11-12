@@ -36,7 +36,7 @@ The header uses the owner-provided horizontal BSE logo at
 `gateway/images/vt-bse-logo.png`, unchanged and at its original aspect ratio.
 It is served locally through `/vt-bse-logo.png` and displayed on a light panel
 for legibility. Beside it, the owner-provided company logo is stored unchanged
-at `web/logo-company/Bumble Bee Seafood Company Logo.png` and served through
+at `web/logo-company-VT/Bumble Bee Seafood Company Logo.png` and served through
 `/bumble-bee-logo.png`. Both images keep their original aspect ratios; the
 header wraps on narrow screens.
 

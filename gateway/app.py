@@ -201,7 +201,7 @@ def handler_for(store, prediction_path=None):
                 mime = 'application/json'
             else:
                 files = {'/vt-bse-logo.png': ('gateway/images/vt-bse-logo.png', 'image/png'),
-                         '/bumble-bee-logo.png': ('web/logo-company/Bumble Bee Seafood Company Logo.png', 'image/png'),
+                         '/bumble-bee-logo.png': ('web/logo-company-VT/Bumble Bee Seafood Company Logo.png', 'image/png'),
                          '/': ('web/index.html', 'text/html; charset=utf-8'), '/app.js': ('web/app.js', 'text/javascript'), '/style.css': ('web/style.css', 'text/css')}
                 if url.path not in files:
                     self.send_error(404)
