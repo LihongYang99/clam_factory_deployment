@@ -142,7 +142,9 @@ Local checks:
 python3 -m unittest discover -s gateway/tests -v
 ```
 
-Current validation: storage/API tests and local Chrome rendering passed. Paho
-installation on the Mac was blocked by DNS/network resolution, so live receiver
-integration and deployment on the Jetson remain unverified. The earlier CLI
-subscriber did receive actual node telemetry; that does not test this new recorder.
+Current validation: nine storage/API tests passed. On November 11, 2026, the
+updated gateway was deployed to Jetson and actual Node 05 EC samples were
+verified through USB, MQTT delivery, SQLite, the API, and Chrome's overview and
+conductivity detail page. Node 01 and Node 02 continued reporting. Calibration
+and compensation remain `UNVERIFIED`; conductivity values near zero are shown
+as received, not presented as verified water measurements.

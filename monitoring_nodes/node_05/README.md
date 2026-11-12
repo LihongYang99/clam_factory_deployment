@@ -5,13 +5,24 @@ operator**. Read-only identification confirmed an **ESP32-S3 v0.2 with 16 MB
 flash and embedded 8 MB PSRAM**, MAC `44:1B:F6:FE:71:50`. Firmware `0.1.3` adds
 explicit USB calibration commands. UART acquisition,
 Wi-Fi at temporary DHCP address `192.168.88.97`, and NTP synchronization are verified.
-MQTT is still disabled; broker delivery and the `.105` reservation remain pending.
-After the operator returned the probe to an ordinary water sample, `CAL END`
-resumed acquisition. A fresh query confirmed mode OFF with stored EZO calibration
-mode 2; this does not establish accuracy. That sample returned 0–4.82 µS/cm,
-with its water type and temperature unrecorded. On November 11, the live Jetson
-EC endpoint still returned HTTP 404, and the local Node 05 MQTT password was
-empty. Gateway deployment and account configuration are the next steps.
+**Live EC delivery was verified on November 11, 2026 at about 9:56 PM EST.**
+The dedicated `clam_node_05` account and publish permissions are installed on
+Jetson. Its random password is stored in the ignored local Node 05 secrets file;
+the matching MQTT-enabled firmware was compiled, uploaded, and hash-verified.
+USB reports `wifi=CONNECTED`, `mqtt=CONNECTED`, and `clock_status=SYNCED`.
+The Jetson API and SQLite contained 17 real EC samples at the checkpoint. USB
+and API sequence 18 matched at 3.22 µS/cm; Chrome displayed EC on both the
+overview and detail page, with history and `UNVERIFIED` quality labels.
+Node 01 and Node 02 continued reporting after deployment.
+
+The `.105` DHCP reservation remains pending; the board currently uses `.97`.
+The latest read-only `CAL STATUS` confirmed mode OFF, K10, compensation setting
+25°C, and stored EZO calibration mode 2. No calibration or temperature commands
+were written during this deployment. Readings ranged from 0 to 8.04 µS/cm in
+the operator's ordinary water sample, whose type and temperature were not
+recorded. This verifies data transport, not measurement accuracy. Keep
+calibration and compensation `UNVERIFIED`; do not clear or rewrite the EZO's
+existing calibration coefficients just to bring telemetry online.
 The 0.1.3 host tests and ESP32 build passed; upload hashes and the on-device
 version were verified. `CAL BEGIN` and `CAL STATUS` responded correctly, with
 USB readings continuing while the forwarding counter remained unchanged.
@@ -74,8 +85,8 @@ repeat's checks still disagree, investigate the standards and measurement path
 before further calibration writes.
 
 Local validation passed the UART parser checks, nine gateway tests, and the
-dashboard browser checks at 1440, 900, and 390 px widths. These checks use test
-fixtures; they do not establish live EC delivery.
+dashboard browser checks at 1440, 900, and 390 px widths. Those fixture checks are
+separate from the live USB/MQTT/SQLite/API/Chrome verification recorded above.
 
 ## Wiring and acquisition
 
