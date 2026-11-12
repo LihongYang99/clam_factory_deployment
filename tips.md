@@ -20,6 +20,35 @@ lihong@lihongyang2026-clam:~$
 Commands in this terminal now run on the Jetson. Run `exit` to return to the Mac.
 Terminal SSH does **not** switch the VS Code Explorer or editor to Jetson files.
 
+## Open the dashboard from home through VT VPN
+
+The Jetson must remain powered on and connected to both the VT campus network
+and the project's router. The campus IP confirmed for this setup is
+`10.141.48.234`; its project LAN IP is `192.168.88.250`.
+
+1. Connect the Mac to **VT VPN**.
+2. Open a **local Mac terminal** (including the VS Code terminal) and run:
+
+   ```bash
+   ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 127.0.0.1:8000:192.168.88.250:8000 lihong@10.141.48.234
+   ```
+
+3. Enter the **Jetson login password**. With `-N`, no remote shell prompt
+   appears; a quiet terminal is normal. Keep this terminal open.
+4. Open **http://localhost:8000** in the Mac browser.
+5. Press **Ctrl+C** in that terminal to close the tunnel when finished.
+
+The browser connects to port 8000 on the Mac. SSH carries that connection
+through the Jetson's campus address to its dashboard at `192.168.88.250:8000`.
+VT VPN alone does not provide access to the project's private LAN address.
+
+If SSH times out, check the VPN connection, the Jetson's current campus IP,
+and whether campus network policy permits VPN-to-Jetson SSH access. On the
+Jetson, `hostname -I` lists its current addresses. If local port 8000 is already
+in use, change `127.0.0.1:8000` in the command to `127.0.0.1:8001` and open
+**http://localhost:8001** instead. If the tunnel connects but the page fails,
+check that the `clam-gateway` service is running on the Jetson.
+
 ## Edit Jetson files with Remote - SSH
 
 Install the Microsoft **Remote - SSH** extension in VS Code if needed.
