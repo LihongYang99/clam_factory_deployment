@@ -45,6 +45,21 @@ class Node05Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate('clam/node_01/telemetry', json.dumps(EC).encode())
 
+    def test_salinity_is_optional_bounded_and_persisted(self):
+        for value in (None, 0, 35.2, 42):
+            data = dict(EC, salinity_psu=value)
+            self.assertEqual(validate(TOPIC, json.dumps(data).encode()), data)
+        for value in (-1, 42.1, True, '35', float('inf')):
+            with self.assertRaises(ValueError):
+                validate(TOPIC, json.dumps(dict(EC, salinity_psu=value)).encode())
+        with self.assertRaises(ValueError):
+            validate(TOPIC, json.dumps(dict(EC, sensor_status='TIMEOUT', conductivity_us_cm=None, salinity_psu=1)).encode())
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder) / 'test.db')
+            data = dict(EC, salinity_psu=35.2)
+            store.ingest(TOPIC, json.dumps(data).encode())
+            self.assertEqual(store.snapshot('node_05', 15)['latest']['sample']['salinity_psu'], 35.2)
+
     def test_nodes_store_and_api_remain_independent(self):
         orp = dict(SAMPLE, node_id='node_02', sensor_model='SEN0709', orp_mv=-120)
         orp.pop('do_mg_l')

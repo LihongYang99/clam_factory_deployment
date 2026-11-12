@@ -259,9 +259,10 @@ h1 { font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; }
 }
 
 .measurement-row strong.not-integrated { color: #b42318; }
-.conductivity-instrument { grid-template-columns: 1.15fr 1.25fr; }
+.conductivity-instrument { grid-template-columns: 1fr 1fr; }
+.conductivity-instrument .quality { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
 @media (min-width: 651px) and (max-width: 1050px) {
-  .conductivity-instrument .quality { grid-column: auto; border-top: 0; border-left: 1px solid var(--line); }
+  .conductivity-instrument .quality { grid-column: 1 / -1; border-left: 0; }
   .conductivity-instrument .quality dl { display: block; }
 }
 .device-ip { display: block; font-size: 14px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -345,4 +346,25 @@ body:has(#temperature-view:not([hidden])) .workspace main { margin-block: 0; }
   .prediction-table th, .prediction-table td { border: 0; min-width: 0; padding: 8px; text-align: left; white-space: normal; }
   .prediction-table td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 14px; margin-bottom: 8px; }
   .prediction-table strong { font-size: 16px; overflow-wrap: anywhere; }
+}
+
+#salinity-reading { padding: 24px; }
+@media (max-width: 650px) { .conductivity-instrument { grid-template-columns: 1fr; } }
+#salinity-reading strong { font-size: 28px; color: #99521b; font-variant-numeric: tabular-nums; }
+#salinity-reading p { margin: 8px 0; }
+
+#camera-image { display:block; width:100%; max-width:960px; height:auto; }
+#camera-image[hidden] { display:none; }
+
+#camera-image { max-height:65vh; object-fit:contain; object-position:left center; }
+
+.camera-preview { display:block; width: min(100%, 160px); margin-top:6px; }
+.camera-preview img { display:block; width:100%; height:auto; max-height:100px; object-fit:contain; object-position:left; }
+.camera-preview img[hidden] { display:none; }
+
+@media (min-width:761px) and (max-width:1399px) {
+  #overview .measurement-group:last-child { display:grid; grid-template-columns:minmax(0,1fr) 160px; column-gap:16px; align-items:center; }
+  #overview .measurement-group:last-child h3 { grid-column:1; }
+  #overview .measurement-group:last-child .measurement-row { grid-column:1; }
+  #overview .camera-preview { grid-column:2; grid-row:1 / 3; margin:0; }
 }

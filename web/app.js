@@ -49,6 +49,13 @@ function setupNavigation() {
       const value=document.createElement('strong'); value.id=`value-${m.id}`; if(!m.live)value.className='not-integrated'; value.textContent=m.live?'—':'Not integrated';
       const state=document.createElement('span'); state.id=`state-${m.id}`; state.className='measurement-state'; state.textContent=m.live?'Waiting for data':''; state.hidden=!m.live;
       row.append(label,value,state); section.append(row);
+      if (m.id === 'camera') {
+        const preview = document.createElement('a'); preview.href = '#camera'; preview.className = 'camera-preview';
+        preview.setAttribute('aria-label', 'Open RGB camera');
+        const image = document.createElement('img'); image.id = 'overview-camera-image';
+        image.alt = 'Live camera preview'; image.hidden = true;
+        preview.append(image); section.append(preview);
+      }
     }
     el('overview-groups').append(section);
   }
@@ -62,7 +69,7 @@ function setupNetwork() {
     {key:'Node 03', role:'pH', planned:true},
     {key:'Node 04', role:'Turbidity', planned:true},
     {key:'Node 05', role:'Electrical conductivity', mac:'44:1B:F6:FE:71:50', planned:true},
-    {key:'Camera 06', role:'RGB camera', planned:true},
+    {key:'Camera 06', role:'RGB camera', mac:'00:12:35:02:DF:76', ip:'192.168.88.106', assignment:'Static / Camera configured'},
     {key:'Node 07', role:'UV254 / Optical COD proxy', planned:true}
   ];
   for (const device of devices) {
@@ -70,7 +77,7 @@ function setupNetwork() {
     name.scope = 'row'; name.textContent = device.name || device.key;
     const role = document.createElement('span'); role.className = 'network-role'; role.textContent = device.role;
     name.append(role); row.append(name);
-    for (const [label, value] of [['IP address', addresses[device.key]], ['MAC address', device.mac || (device.planned ? 'Not assigned' : 'Not recorded')], ['Assignment', device.planned ? 'Planned' : 'Configured']]) {
+    for (const [label, value] of [['IP address', device.ip || addresses[device.key]], ['MAC address', device.mac || (device.planned ? 'Not assigned' : 'Not recorded')], ['Assignment', device.assignment || (device.planned ? 'Planned' : 'Configured')]]) {
       const cell = document.createElement('td'); cell.dataset.label = label; cell.textContent = value; row.append(cell);
     }
     el('network-rows').append(row);
@@ -195,11 +202,12 @@ function selectView() {
   const temperature=id==='temperature', prediction=id==='predictions', network=id==='network', overview=!m && !prediction && !temperature && !network;
   el('overview').hidden=!overview; el('prediction-view').hidden=!prediction;
   el('network-view').hidden=!network;
+  el('camera-view').hidden=id!=='camera';
   el('temperature-view').hidden=!temperature;
-  el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live;
+  el('live-detail').hidden=temperature || !m?.live; el('planned-view').hidden=!m || m.live || id==='camera';
   el('view-subtitle').textContent=m ? `${m.node}${m.live ? ` / ${m.id==='conductivity'?'Planned IP':'IP'}: ${addresses[m.node]}` : ''}` : '';
   el('view-subtitle').hidden=!m || temperature;
-  document.querySelector('.timestamp').hidden=prediction || temperature || network;
+  document.querySelector('.timestamp').hidden=prediction || temperature || network || id==='camera';
   const navId=temperature || m?.key==='temperature_c'?'temperature':overview?'overview':id;
   for(const a of el('sensor-nav').querySelectorAll('a')) {
     if(a.hash===`#${navId}`) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
@@ -262,6 +270,8 @@ function chart(data) {
   const svg = el('chart'); svg.replaceChildren();
   const width = Math.max(280, svg.getBoundingClientRect().width);
   svg.setAttribute('viewBox', `0 0 ${width} 240`);
+  const ecChart = activeMeasurement.id === 'conductivity';
+  const right = ecChart ? 60 : 15;
   const rows = data.history, end = data.server_time, start = end - Number(el('window').value) * 60;
   const values = rows.filter(r => r.sample.sensor_status === 'OK' && Number.isFinite(r.sample[activeMeasurement.key])).map(r => r.sample[activeMeasurement.key]);
   const spec=accuracy[activeMeasurement.id], margin=spec?.delta || 0;
@@ -269,7 +279,7 @@ function chart(data) {
   const low = values.length ? Math.min(...values)-margin-0.5 : 0;
   const high = values.length ? Math.max(low+1, Math.max(...values)+margin+0.5) : 10;
   const make = (tag, attrs) => {const n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));svg.append(n);return n;};
-  for(let i=0;i<4;i++) {const y=15+i*65;make('line',{x1:55,x2:width-15,y1:y,y2:y,stroke:'#d7e1e8'});const t=make('text',{x:0,y:y+5,fill:'#526779','font-size':14});t.textContent=(high-i*(high-low)/3).toFixed(1);}
+  for(let i=0;i<4;i++) {const y=15+i*65;make('line',{x1:55,x2:width-right,y1:y,y2:y,stroke:'#d7e1e8'});const t=make('text',{x:0,y:y+5,fill:'#526779','font-size':14});t.textContent=(high-i*(high-low)/3).toFixed(1);}
   const bands=make('g',{'class':'accuracy-bands','aria-hidden':'true'});
   let segment=[];
   const flushBand=()=>{
@@ -285,7 +295,7 @@ function chart(data) {
   for (const row of rows) {
     const s=row.sample;
     if(s.sensor_status!=='OK'||!Number.isFinite(s[activeMeasurement.key])){flushBand();previous=null;continue;}
-    const x=55+(row.received_at-start)/(end-start)*(width-70), y=15+(high-s[activeMeasurement.key])/(high-low)*195;
+    const x=55+(row.received_at-start)/(end-start)*(width-55-right), y=15+(high-s[activeMeasurement.key])/(high-low)*195;
     const join=previous && row.received_at-previous.received_at<=20 && s.boot_id===previous.sample.boot_id && s.sequence===previous.sample.sequence+1;
     if(!join)flushBand();
     segment.push({x,y});
@@ -295,8 +305,28 @@ function chart(data) {
   }
   flushBand();
   make('path',{d:path,fill:'none',stroke:'#17657b','stroke-width':2});
+  if (ecChart) {
+    el('chart-caption').textContent='EC: solid teal / left axis (µS/cm). Estimated salinity: dashed orange / right axis (PSU). Separate scales; both use the same probe.';
+    for(let i=0;i<4;i++) {
+      const t=make('text',{x:width-3,y:20+i*65,fill:'#99521b','font-size':14,'text-anchor':'end'});
+      t.textContent=String(42-i*14);
+    }
+    let saltPath='', prev=null, count=0;
+    for(const row of rows) {
+      const s=row.sample, value=s.salinity_psu;
+      if(s.sensor_status!=='OK'||!Number.isFinite(value)||value<0||value>42){prev=null;continue;}
+      const x=55+(row.received_at-start)/(end-start)*(width-55-right), y=15+(42-value)/42*195;
+      const join=prev && row.received_at-prev.received_at<=20 && s.boot_id===prev.sample.boot_id && s.sequence===prev.sample.sequence+1;
+      saltPath+=`${join?'L':'M'}${x.toFixed(2)},${y.toFixed(2)} `;
+      const point=make('circle',{cx:x,cy:y,r:2,fill:'#99521b'});
+      const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${date(row.received_at)}: ${number(value)} PSU (estimated)`;point.append(title);
+      prev=row;count++;
+    }
+    make('path',{d:saltPath,fill:'none',stroke:'#99521b','stroke-width':2,'stroke-dasharray':'6 4',class:'salinity-line'});
+    if(!count)el('chart-caption').textContent+=' No salinity samples in this window.';
+  }
   el('empty').hidden=values.length>0;
-  svg.setAttribute('aria-label',values.length?`${activeMeasurement.name}: ${values.length} valid readings. See recent readings table below.`:`No valid ${activeMeasurement.name.toLowerCase()} readings in this window`);
+  svg.setAttribute('aria-label',values.length?`${activeMeasurement.name}: ${values.length} valid readings. ${ecChart?'Estimated salinity uses the right axis (0–42 PSU). ':''}See recent readings table below.`:`No valid ${activeMeasurement.name.toLowerCase()} readings in this window`);
   el('start').textContent=new Date(start*1000).toLocaleTimeString();el('end').textContent=new Date(end*1000).toLocaleTimeString();
 }
 function render(data) {
@@ -307,10 +337,13 @@ function render(data) {
   document.querySelector('.primary-reading > span').textContent=primary.name;
   document.querySelector('.primary-reading .unit').textContent=primary.unit;
   document.querySelector('.secondary-readings').hidden=ec;
+  el('salinity-reading').hidden=!ec;
+  el('salinity').textContent=s?.sensor_status==='OK'?number(s?.salinity_psu):'—';
   document.querySelector('.instrument').classList.toggle('conductivity-instrument',ec);
   document.querySelector('#sat').closest('div').hidden=primaryId!=='do';
   document.querySelector('#live-detail thead th:nth-child(2)').textContent=`${probe} (${primary.unit})`;
-  document.querySelector('#live-detail thead th:nth-child(3)').hidden=ec;
+  document.querySelector('#live-detail thead th:nth-child(3)').hidden=false;
+  document.querySelector('#live-detail thead th:nth-child(3)').textContent=ec?'Estimated salinity (PSU)':'Temperature (°C)';
   document.querySelector('.details p').textContent=`${probe} probe → ${activeMeasurement.node} → MQTT → SQLite`;
   el('temperature-source').hidden=!activeMeasurement.id.startsWith('temperature');
   el('temperature-source').textContent=`Source: ${activeMeasurement.node} / ${probe} probe`;
@@ -320,7 +353,7 @@ function render(data) {
   el('notice').textContent=!s?'Waiting for the first stored reading. No simulated data is displayed.':s.sensor_status!=='OK'?`Sensor reports ${s.sensor_status}. Invalid measurements remain missing.`:`${s.clock_status==='UNSYNCED'?'Node clock is unsynchronized. ':''}History uses gateway receive time, not sample time. Calibration: ${s.calibration_status}; compensation: ${s.compensation_status}.`;
   el('pipeline').textContent=data.health.storage_error?'SQLite write failed; recording needs attention':data.health.subscription_ready?'MQTT subscription active; readings committed to SQLite before acknowledgment':'MQTT subscription pending; showing stored history';
   chart(data);el('rows').replaceChildren();
-  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[primary.key]),...(ec?[]:[number(r.sample.temperature_c)]),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
+  for(const r of data.history.slice(-20).reverse()){const tr=document.createElement('tr');for(const text of [date(r.received_at),number(r.sample[primary.key]),number(ec?r.sample.salinity_psu:r.sample.temperature_c),r.sample.sensor_status]){const td=document.createElement('td');td.textContent=text;tr.append(td);}el('rows').append(tr);}
   freshness();
 }
 function showSelectedNode() {
@@ -366,3 +399,36 @@ setInterval(refresh,5000);setInterval(freshness,1000);refresh();
 
 let resizeFrame;
 window.addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(()=>{if(last)chart(last);});});
+
+let cameraBusy = false;
+async function refreshCamera() {
+  if (cameraBusy || document.hidden) return;
+  cameraBusy = true;
+  const images = [el('camera-image'), el('overview-camera-image')];
+  try {
+    const response = await fetch('/api/camera', {signal: AbortSignal.timeout(4000)});
+    if (!response.ok) throw new Error();
+    const state = await response.json();
+    const live = state.status === 'live';
+    el('value-camera').textContent = live ? 'Live preview' : 'Camera unavailable';
+    el('value-camera').classList.toggle('not-integrated', !live);
+    el('camera-status').textContent = live ? `Frame received ${date(state.received_at)}` : 'Camera unavailable / Waiting for a fresh frame';
+    if (!live) { for (const img of images) { img.hidden = true; img.removeAttribute('src'); } }
+    else if (!el('camera-view').hidden || !el('overview').hidden) {
+      const frame = await fetch(`/camera.jpg?t=${Date.now()}`, {signal: AbortSignal.timeout(4000)});
+      if (!frame.ok) throw new Error();
+      const url = URL.createObjectURL(await frame.blob());
+      try {
+        await Promise.all(images.map(async img => { img.src = url; await img.decode(); img.hidden = false; }));
+      } finally { URL.revokeObjectURL(url); }
+    }
+  } catch {
+    for (const img of images) { img.hidden = true; img.removeAttribute('src'); }
+    el('camera-status').textContent = 'Camera unavailable / Retrying';
+    el('value-camera').textContent = 'Camera unavailable';
+    el('value-camera').classList.add('not-integrated');
+  } finally { cameraBusy = false; }
+}
+setInterval(refreshCamera, 2000);
+window.addEventListener('hashchange', refreshCamera);
+refreshCamera();

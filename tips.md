@@ -30,24 +30,36 @@ and the project's router. The campus IP confirmed for this setup is
 2. Open a **local Mac terminal** (including the VS Code terminal) and run:
 
    ```bash
-   ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 127.0.0.1:8000:192.168.88.250:8000 lihong@10.141.48.234
+   ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 127.0.0.1:8001:192.168.88.250:8000 lihong@10.141.48.234
    ```
 
 3. Enter the **Jetson login password**. With `-N`, no remote shell prompt
    appears; a quiet terminal is normal. Keep this terminal open.
-4. Open **http://localhost:8000** in the Mac browser.
+4. Open **http://localhost:8001** in the Mac browser.
 5. Press **Ctrl+C** in that terminal to close the tunnel when finished.
 
-The browser connects to port 8000 on the Mac. SSH carries that connection
+Use port **8001** consistently on the Mac; the Jetson dashboard remains on port **8000**.
+The browser connects to port 8001 on the Mac. SSH carries that connection
 through the Jetson's campus address to its dashboard at `192.168.88.250:8000`.
 VT VPN alone does not provide access to the project's private LAN address.
 
 If SSH times out, check the VPN connection, the Jetson's current campus IP,
 and whether campus network policy permits VPN-to-Jetson SSH access. On the
-Jetson, `hostname -I` lists its current addresses. If local port 8000 is already
-in use, change `127.0.0.1:8000` in the command to `127.0.0.1:8001` and open
-**http://localhost:8001** instead. If the tunnel connects but the page fails,
-check that the `clam-gateway` service is running on the Jetson.
+Jetson, `hostname -I` lists its current addresses. If the tunnel connects but the
+page fails, check that the `clam-gateway` service is running on the Jetson.
+
+If port 8001 is already in use, first try **http://localhost:8001**: an existing
+SSH tunnel may already be working. Do not start a second tunnel. To identify
+its listener, run on the Mac:
+
+```bash
+lsof -nP -iTCP:8001 -sTCP:LISTEN
+```
+
+If it is an old SSH tunnel, close its terminal session with **Ctrl+C** before
+reconnecting. If that terminal is unavailable, use `kill <PID>` only after
+confirming the listed process is the old tunnel; replace `<PID>` with the
+current process ID. Keep using port 8001.
 
 ## Edit Jetson files with Remote - SSH
 

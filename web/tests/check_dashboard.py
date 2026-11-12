@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as folder:
             page.route('**/api/node_01*', lambda r: r.fulfill(json=payload))
             ec_sample = {key:value for key,value in SAMPLE.items() if key not in ('do_mg_l', 'temperature_c', 'saturation_pct')}
             ec_sample.update(node_id='node_05', sensor_model='EZO-EC', conductivity_us_cm=1413.5,
-                             probe_k=1.0, compensation_temperature_c=25.0)
+                             probe_k=10.0, compensation_temperature_c=25.0, salinity_psu=0.7)
             ec_payload = dict(payload, history=[{'received_at':now-10, 'sample':dict(ec_sample, sequence=32, conductivity_us_cm=1410)},
                                                {'received_at':now-5, 'sample':dict(ec_sample, sequence=33)}])
             ec_payload['latest'] = ec_payload['history'][-1]
@@ -142,12 +142,13 @@ with tempfile.TemporaryDirectory() as folder:
                 expect(page.locator('#temperature-source')).to_be_hidden()
                 expect(page.locator('#view-subtitle')).to_have_text('Node 05 / Planned IP: 192.168.88.105')
                 expect(page.locator('.details p').first).to_have_text('EC probe → Node 05 → MQTT → SQLite')
-                expect(page.locator('#chart title').last).to_contain_text('1413.50 µS/cm')
+                expect(page.locator('#salinity')).to_have_text('0.70')
+                expect(page.locator('.salinity-line')).to_have_attribute('stroke-dasharray', '6 4')
                 expect(page.locator('.accuracy-bands polygon')).to_have_count(0)
-                expect(page.locator('#chart-caption')).to_have_text('Gateway receive time (µS/cm)')
-                expect(page.locator('#live-detail thead th:not([hidden])')).to_have_text(['Received', 'EC (µS/cm)', 'Sensor'])
+                expect(page.locator('#chart-caption')).to_contain_text('right axis (PSU)')
+                expect(page.locator('#live-detail thead th:not([hidden])')).to_have_text(['Received', 'EC (µS/cm)', 'Estimated salinity (PSU)', 'Sensor'])
                 expect(page.locator('#rows tr')).to_have_count(2)
-                expect(page.locator('#rows tr').first.locator('td')).to_have_count(3)
+                expect(page.locator('#rows tr').first.locator('td')).to_have_count(4)
                 expect(page.locator('#rows tr').first).not_to_contain_text('25.00')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 page.evaluate('window.scrollTo(0, 0)')
@@ -245,7 +246,11 @@ with tempfile.TemporaryDirectory() as folder:
             ec_payload['history'] = [ec_payload['latest']]
             page.evaluate('refresh()')
             expect(page.locator('#do')).to_have_text('0.00')
-            expect(page.locator('#chart title')).to_contain_text('0.00 µS/cm')
+            expect(page.locator('#chart title').first).to_contain_text('0.00 µS/cm')
+            ec_payload['latest']['sample'].pop('salinity_psu')
+            page.evaluate('refresh()')
+            expect(page.locator('#salinity')).to_have_text('—')
+            expect(page.locator('#chart-caption')).to_contain_text('No salinity samples')
             ec_payload['latest']['sample'].update(sensor_status='TIMEOUT', conductivity_us_cm=None)
             page.evaluate('refresh()')
             expect(page.locator('#do')).to_have_text('—')

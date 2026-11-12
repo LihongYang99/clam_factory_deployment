@@ -75,6 +75,11 @@ def validate(topic, payload):
     if node == 'node_05':
         if data.get('sensor_model') != 'EZO-EC':
             raise ValueError('unsupported conductivity sensor')
+        salinity = data.get('salinity_psu')  # Optional for older firmware/history.
+        if salinity is not None:
+            if (type(salinity) not in (int, float) or not math.isfinite(salinity)
+                    or not 0 <= salinity <= 42 or data['sensor_status'] != 'OK'):
+                raise ValueError('invalid salinity')
         setting = data.get('compensation_temperature_c')
         if setting is not None and (type(setting) not in (int, float) or not math.isfinite(setting)):
             raise ValueError('invalid compensation temperature setting')
@@ -176,12 +181,21 @@ class Store:
                 'history': [unpack(row) for row in reversed(rows)], 'stale_after_seconds': 20}
 
 
-def handler_for(store, prediction_path=None):
+def handler_for(store, prediction_path=None, camera=None):
     prediction_path = ROOT / 'data' / 'predictions.json' if prediction_path is None else prediction_path
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             url = urlsplit(self.path)
-            if url.path == '/api/predictions':
+            if url.path in ('/api/camera', '/camera.jpg'):
+                frame, state = camera.snapshot() if camera else (None, {'status': 'not_configured', 'received_at': None})
+                if url.path == '/camera.jpg':
+                    if frame is None:
+                        self.send_error(503, 'No current camera frame')
+                        return
+                    body, mime = frame, 'image/jpeg'
+                else:
+                    body, mime = json.dumps(state).encode(), 'application/json'
+            elif url.path == '/api/predictions':
                 body = json.dumps(prediction_snapshot(prediction_path), allow_nan=False).encode()
                 mime = 'application/json'
             elif url.path in ('/api/node_01', '/api/node_02', '/api/node_05'):
@@ -213,7 +227,7 @@ def handler_for(store, prediction_path=None):
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
-            self.send_header('Content-Security-Policy', "default-src 'self'; object-src 'none'; frame-ancestors 'none'")
+            self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; object-src 'none'; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -229,6 +243,8 @@ def main():
     password = os.environ.get('MQTT_PASSWORD')
     if not password:
         raise SystemExit('Set MQTT_PASSWORD in gateway/.env (gateway account, not node account).')
+    from camera import Camera
+    camera = Camera(os.environ.get('CAMERA_RTSP_URI', ''))
     store = Store(ROOT / 'data' / 'telemetry.sqlite3')
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id='clam-receiver', clean_session=False, manual_ack=True)
     client.username_pw_set(os.environ.get('MQTT_USER', 'clam_gateway'), password)
@@ -266,7 +282,7 @@ def main():
 
     client.on_connect, client.on_disconnect = connected, disconnected
     client.on_subscribe, client.on_message = subscribed, message
-    server = ThreadingHTTPServer((os.environ.get('HTTP_HOST', '127.0.0.1'), int(os.environ.get('HTTP_PORT', '8000'))), handler_for(store))
+    server = ThreadingHTTPServer((os.environ.get('HTTP_HOST', '127.0.0.1'), int(os.environ.get('HTTP_PORT', '8000'))), handler_for(store, camera=camera))
     client.connect_async(os.environ.get('MQTT_HOST', '192.168.88.250'), int(os.environ.get('MQTT_PORT', '1883')), 30)
     client.loop_start()
     LOG.info('Dashboard listening on %s:%s', *server.server_address)

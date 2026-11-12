@@ -9,7 +9,12 @@ ezoec::Reply receive(const char* bytes) {
 }
 
 int main() {
-  double value = 0;
+  double value = 0, salt = 0;
+  assert(!ezoec::measurements("53000,35.00", value, salt) && value == 53000 && salt == 35);
+  assert(!ezoec::measurements("0,0.00", value, salt) && value == 0 && salt == 0);
+  assert(!ezoec::measurements("80000,43", value, salt) && value == 80000 && std::isnan(salt));
+  for (const char* bad : {"1413", "1413,", ",35", "1413,1,2", "1413,nan", "1413,-1", "nan,35"})
+    assert(ezoec::measurements(bad, value, salt));
   auto reply = receive("\r\n1413.25\r\n*OK\r");
   assert(!reply.result(true));
   assert(!ezoec::conductivity(reply.data, value) && value == 1413.25);

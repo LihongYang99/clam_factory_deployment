@@ -89,4 +89,20 @@ inline const char* conductivity(const char* data, double& value) {
   return nullptr;
 }
 
+// Output order is fixed by EZO: EC, TDS, salinity, specific gravity.
+// This firmware enables only EC and salinity; reject other output shapes.
+inline const char* measurements(const char* data, double& ec, double& salinity) {
+  const char* comma = strchr(data, ',');
+  if (!comma || comma == data || size_t(comma - data) >= 32)
+    return "INVALID_READING";
+  char first[32]{};
+  memcpy(first, data, size_t(comma - data));
+  const char* error = conductivity(first, ec);
+  if (error) return error;
+  if (!decimal(comma + 1, salinity) || salinity < 0) return "INVALID_READING";
+  // Preserve valid EC even when salinity exceeds the documented output range.
+  if (salinity > 42) salinity = NAN;
+  return nullptr;
+}
+
 }  // namespace ezoec

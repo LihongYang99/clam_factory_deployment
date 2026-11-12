@@ -108,7 +108,7 @@ reading normally takes 600 ms. The firmware allows 1800 ms per transaction and
 requires the numeric response plus `*OK`.
 
 Initialization disables continuous output, enables acknowledgements, queries
-`i`, `Status`, `K,?`, `T,?`, and `Cal,?`, then enables EC output and disables TDS, salinity,
+`i`, `Status`, `K,?`, `T,?`, and `Cal,?`, then enables EC and salinity output and disables TDS
 and specific gravity. Firmware 0.1.1 matches the confirmed physical K10 probe:
 if K differs from 10 and `Cal,?` reports mode 0, it sends `K,10` and requires
 acknowledged K=10 readback. It attempts that write at most once per boot; an
@@ -123,6 +123,7 @@ Telemetry uses `clam/node_05/telemetry` and `clam/node_05/status`:
 | Field | Meaning |
 | --- | --- |
 | `conductivity_us_cm` | Conductivity in µS/cm; null on failure; a valid zero remains zero |
+| `salinity_psu` | EZO-derived PSS-78 salinity, 0–42 PSU; null on failure or out-of-range output; absent in older firmware |
 | `probe_k` | K value queried from the EZO circuit |
 | `compensation_temperature_c` | Queried compensation setting, **not measured water temperature** |
 | `calibration_status`, `compensation_status` | `UNVERIFIED` in this firmware |
@@ -197,7 +198,7 @@ port, then upload in the same Mac terminal:
 ```
 
 If needed, press RESET once without BOOT to start the application. Expect
-`node_05`, firmware `0.1.3`, and `event=EC_CONFIG` showing the queried K,
+`node_05`, firmware `0.1.4`, and `event=EC_CONFIG` showing the queried K,
 compensation setting, and calibration mode. For K10, initialization should reach
 `event=EC_READY`; subsequent JSON should contain actual conductivity and
 `sensor_status=OK`. A timeout, wrong sensor, or configuration error must remain
@@ -381,3 +382,30 @@ appropriate standards remains a separate task.
   probe specifications; no internal temperature sensor.
 - [Atlas isolated carrier](https://files.atlas-scientific.com/Isccb.pdf):
   verify the installed carrier and its connections.
+
+## EC and estimated salinity (firmware 0.1.4)
+
+Initialization sends `O,EC,1`, `O,TDS,0`, `O,S,1`, and `O,SG,0`.
+Each acknowledged `R` response must contain exactly `EC,salinity` in that order.
+Both values are uploaded in the same sample and stored together. Invalid frames
+produce null values; salinity above 42 PSU is omitted while valid EC is retained.
+No calibration or temperature-compensation writes are added by this feature.
+
+Atlas converts conductivity to practical salinity using PSS-78 (datasheet p. 72).
+This is an estimate from the same probe, not an independent salt measurement or
+a direct measurement of salt mass. Wastewater composition can differ from seawater.
+The existing 25°C compensation setting is not a measured liquid temperature;
+calibration and compensation remain UNVERIFIED.
+
+The EC detail page shows both current values and two time-aligned lines:
+solid teal EC on the left axis (µS/cm), dashed orange estimated salinity on the
+right axis (0–42 PSU). Separate axes do not imply comparable magnitudes.
+Recent readings include both values. Old samples without salinity remain missing;
+no historical values are synthesized. Missing/error samples and acquisition gaps
+break the curves. Firmware must be rebuilt and flashed using sections 2–3.
+
+Deploy `gateway/app.py`, `web/index.html`, `web/app.js`, and `web/style.css` to the
+Jetson and restart `clam-gateway` after the gateway update. Preserve `.env`,
+the telemetry database, and all MQTT accounts. Confirm a real new sample contains
+both fields in USB output, `/api/node_05`, and the EC detail page before considering
+the end-to-end deployment verified.

@@ -10,7 +10,7 @@
 #include "arduino_secrets.h"
 
 constexpr char NODE_ID[] = "node_05";
-constexpr char VERSION[] = "0.1.3";
+constexpr char VERSION[] = "0.1.4";
 constexpr char TELEMETRY_TOPIC[] = "clam/node_05/telemetry";
 constexpr char STATUS_TOPIC[] = "clam/node_05/status";
 constexpr int EC_TX = 17;
@@ -121,10 +121,10 @@ const char* initializeProbe(ezoec::Reply& reply) {
         fabs(configuredK - PROBE_K) > 0.001) return "CONFIG_MISMATCH";
     printLine("event=EC_K_CONFIRMED probe_k=10 calibration=UNVERIFIED");
   }
-  for (const char* command : {"O,EC,1", "O,TDS,0", "O,S,0", "O,SG,0"}) {
+  for (const char* command : {"O,EC,1", "O,TDS,0", "O,S,1", "O,SG,0"}) {
     if ((error = transact(command, false, reply))) return error;
   }
-  printLine("event=EC_READY output=EC unit=uS_cm calibration=UNVERIFIED compensation=UNVERIFIED");
+  printLine("event=EC_READY output=EC,S units=uS_cm,PSU calibration=UNVERIFIED compensation=UNVERIFIED");
   return nullptr;
 }
 
@@ -146,13 +146,15 @@ void sample() {
     gmtime_r(&now, &utc);
     strftime(timestamp, sizeof(timestamp), "\"%Y-%m-%dT%H:%M:%SZ\"", &utc);
   }
-  double conductivity = 0;
+  double conductivity = 0, salinity = NAN;
   if (!error) error = transact("R", true, reply);
-  if (!error) error = ezoec::conductivity(reply.data, conductivity);
+  if (!error) error = ezoec::measurements(reply.data, conductivity, salinity);
   if (error) probeReady = false;
 
   char raw[257] = "";
   for (size_t i = 0; i < reply.count; ++i) snprintf(raw + i * 2, 3, "%02X", reply.raw[i]);
+  char salt[32] = "null";
+  if (!error && std::isfinite(salinity)) snprintf(salt, sizeof(salt), "%.8g", salinity);
   char ec[32] = "null", k[24] = "null", temp[24] = "null";
   if (!error) snprintf(ec, sizeof(ec), "%.8g", conductivity);
   if (std::isfinite(configuredK)) snprintf(k, sizeof(k), "%.6g", configuredK);
@@ -162,13 +164,13 @@ void sample() {
       "{\"schema_version\":1,\"node_id\":\"%s\",\"sensor_model\":\"EZO-EC\","
       "\"firmware_version\":\"%s\",\"boot_id\":\"%s\",\"sequence\":%lu,"
       "\"sample_time_utc\":%s,\"uptime_ms\":%llu,\"clock_status\":\"%s\","
-      "\"conductivity_us_cm\":%s,\"probe_k\":%s,\"compensation_temperature_c\":%s,"
+      "\"conductivity_us_cm\":%s,\"salinity_psu\":%s,\"probe_k\":%s,\"compensation_temperature_c\":%s,"
       "\"sensor_status\":\"%s\",\"calibration_status\":\"UNVERIFIED\","
       "\"compensation_status\":\"UNVERIFIED\",\"raw_hex\":\"%s\","
       "\"raw_truncated\":%s,\"not_forwarded_before_sample\":%lu}",
       NODE_ID, VERSION, bootId, (unsigned long)sequence, timestamp,
       (unsigned long long)sampleUptimeMs, syncedAtSample ? "SYNCED" : "UNSYNCED",
-      ec, k, temp, error ? error : "OK", raw, reply.truncated ? "true" : "false",
+      ec, salt, k, temp, error ? error : "OK", raw, reply.truncated ? "true" : "false",
       (unsigned long)notForwarded);
   if (length < 0 || size_t(length) >= sizeof(payload)) {
     ++notForwarded;
@@ -212,7 +214,7 @@ void calibrationStatus() {
 void calibrate(ezoec::Calibration::Step step, const char* command, double target) {
   const char* error = calibration.check(step);
   ezoec::Reply reply;
-  double mode = NAN, reading = NAN;
+  double mode = NAN, reading = NAN, salinity = NAN;
   if (!error) error = transact("i", true, reply);
   if (!error && !ezoec::startsWith(reply.data, "?I,EC,")) error = "WRONG_SENSOR";
   if (!error) error = calibrationSettings(reply, mode);
@@ -221,7 +223,7 @@ void calibrate(ezoec::Calibration::Step step, const char* command, double target
   // Dry calibration can correct a nonzero air reading; dryness is operator-confirmed.
   if (!error && step != ezoec::Calibration::DRY) {
     error = transact("R", true, reply);
-    if (!error) error = ezoec::conductivity(reply.data, reading);
+    if (!error) error = ezoec::measurements(reply.data, reading, salinity);
     if (!error && reading == 0) error = "ZERO_READING_IN_STANDARD";
     if (!error && fabs(reading - target) > target * 0.4)
       printLine("event=CAL_READING_WARNING outside_approximate_40_percent=true");
@@ -276,7 +278,7 @@ void serviceCalibration() {
 
 void setup() {
   Serial.begin(115200);
-  printLine("event=BOOT node=node_05 firmware=0.1.3");
+  printLine("event=BOOT node=node_05 firmware=0.1.4");
   probe.begin(9600, SERIAL_8N1, EC_RX, EC_TX);
   snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
   snprintf(clientId, sizeof(clientId), "clam-node05-%012llx", (unsigned long long)ESP.getEfuseMac());

@@ -33,6 +33,12 @@
 <div class="table-scroll"><table class="prediction-table"><caption>Forecasts are estimates, not sensor readings.</caption><thead><tr><th scope="col">Measurement</th><th scope="col">Latest reading</th><th scope="col">12h forecast</th><th scope="col">Difference</th></tr></thead><tbody id="prediction-rows"></tbody></table></div>
 <p class="prediction-model" id="prediction-model">No LSTM results have been received. Hourly inference is not configured yet.</p>
 </section>
+<section id="camera-view" hidden aria-labelledby="camera-heading">
+<h2 id="camera-heading">RGB camera</h2>
+<p id="camera-status" role="status">Connecting to camera…</p>
+<img id="camera-image" hidden alt="Current view from the factory monitoring camera">
+<p>Live preview / Refreshes every 2 seconds / No recording</p>
+</section>
 <section id="planned-view" hidden aria-labelledby="planned-title"><h2 id="planned-title"></h2><p class="planned-state">Not integrated</p><p id="planned-description"></p><dl id="planned-facts"></dl><a href="#overview">Back to overview</a></section>
 <div id="live-detail" hidden>
 <h2 id="detail-title">Dissolved oxygen</h2>
@@ -41,6 +47,7 @@
 <section class="instrument" aria-label="Latest water quality readings">
 <div class="primary-reading"><span>Dissolved oxygen</span><div><strong id="do">—</strong><span class="unit">mg/L</span></div><span id="sample-state">No sample</span></div>
 <div class="secondary-readings"><div><span>Water temperature</span><p><strong id="temp">—</strong> <span>°C</span></p></div><div><span>Oxygen saturation</span><p><strong id="sat">—</strong> <span>%</span></p></div></div>
+<div id="salinity-reading" hidden><span>Estimated salinity</span><p><strong id="salinity">—</strong> PSU</p><p>EZO PSS-78 estimate / Calibration and temperature compensation unverified</p></div>
 <div class="quality"><h2>Measurement quality</h2><dl><div><dt>Sensor response</dt><dd id="sensor">Unknown</dd></div><div><dt>Node clock</dt><dd id="clock">Unknown</dd></div><div><dt>Calibration</dt><dd id="calibration">Unknown</dd></div><div><dt>Compensation</dt><dd id="compensation">Unknown</dd></div></dl></div>
 </section>
 <section class="trend"><div class="section-top"><div><h2 id="chart-title">Dissolved oxygen history</h2><p id="chart-caption">Gateway receive time (mg/L); gaps preserve missing readings</p></div><div class="controls"><label for="window">Window</label><select id="window"><option value="15">15 minutes</option><option value="60">1 hour</option></select><button id="pause" type="button" aria-pressed="false">Pause display</button></div></div><div class="plot"><svg id="chart" viewBox="0 0 1000 240" role="img" aria-label="Dissolved oxygen history; no data yet"></svg><p id="empty">Waiting for measurements</p></div><div class="axis"><span id="start">—</span><span>Local browser time</span><span id="end">—</span></div></section>
