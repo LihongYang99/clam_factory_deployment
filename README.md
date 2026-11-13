@@ -4,16 +4,19 @@ Real-time wastewater monitoring for a clam processing facility, built one sensor
 board at a time. The longer-term research goal is multimodal estimation of
 laboratory BOD₅ from water-quality measurements, images, and process context.
 
-**Current milestone:** bring Node 01 dissolved oxygen and temperature data onto
-a live monitoring dashboard over the local network.
+**Current milestone:** operate a shared monitoring dashboard for sensor telemetry
+and live camera previews on the Jetson Orin Nano.
 
-**Status:** Node 01 v0.1.3 is running on hardware. User-provided serial logs confirm
-UART0 diagnostics, Wi-Fi association, DHCP addressing, and periodic sensor polls.
-User logs now confirm sensor_status=OK with DO, saturation, and temperature.
-Jetson LAN address `192.168.88.250` is owner-confirmed. Clock synchronization,
-live deployment of the new recorder/dashboard remains pending. Two actual Node 01
-telemetry messages were received on Jetson over MQTT on 2026-11-06.
-See the [Jetson MQTT setup](gateway/README.md) for the next step.
+**Status (updated November 13, 2026):** Node 01 DO/temperature, Node 02
+ORP/temperature, and Node 05 EC/estimated salinity have delivered real telemetry
+to the deployed gateway and dashboard. Calibration and compensation remain
+unverified. Camera 06 has supplied real images to the RGB camera page and the
+Overview preview. Its static address was changed to `192.168.88.106` on November
+12; the gateway stream configuration was updated, and a service restart was
+requested. Post-change stream recovery has not yet been verified.
+
+See [dashboard setup](docs/dashboard_setup.md), [MQTT setup](gateway/README.md),
+and [camera setup](docs/camera_setup.md) for operation and troubleshooting.
 
 ## Phase 1: monitor first
 
@@ -26,23 +29,39 @@ See the [Jetson MQTT setup](gateway/README.md) for the next step.
 - Allow the Mac and other authorized devices on the LAN to view the dashboard.
 - Preserve real readings and expose disconnected, stale, and invalid states.
 
-Actuator control, BOD prediction, and VT branding are later milestones. Phase 1
+Actuator control and trained BOD prediction are later milestones. The dashboard
+already includes VT and company branding and a prediction-results placeholder. Phase 1
 does not include pump, valve, heater, or remote sampling-control interfaces.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    S[Water-quality sensor] --> I[Sensor interface]
-    I --> N[ESP32 node]
+    S[DO / ORP / EC probes] -->|RS485 or UART| N[ESP32 Nodes 01 / 02 / 05]
     M[Mac: flash and debug] -. USB during setup .-> N
     N -->|Wi-Fi / MQTT| R[Local router]
-    R <-->|Ethernet| J[Jetson Orin Nano]
-    J --> D[(SQLite: raw data and measurements)]
-    D --> W[Monitoring dashboard]
-    B[Mac / phone browser on LAN] -->|HTTP| W
-    R --- U[VT campus uplink]
+    C["Camera 06: Barlus RGB<br/>192.168.88.106"] <-->|Ethernet / LAN port| R
+    R <-->|Ethernet| J["Jetson Orin Nano<br/>192.168.88.250"]
+    subgraph Gateway[Services on Jetson]
+        Q[Mosquitto MQTT broker] --> V[Validate telemetry]
+        V --> D[(SQLite sensor records)]
+        P["RTSP over TCP / GStreamer"] --> F[Latest JPEG in memory]
+        D --> H[Python HTTP service]
+        F --> H
+    end
+    J -->|Sensor messages| Q
+    J -->|Camera stream discovered via ONVIF| P
+    H -->|HTTP / JSON and JPEG| W["Browser dashboard<br/>Overview / Sensor trends / RGB camera"]
 ```
+
+Camera images use a separate RTSP acquisition path, not MQTT. The Overview has a
+small live preview; the RGB camera page shows the larger image. The gateway
+keeps only the latest JPEG in memory, and the browser refreshes it every two
+seconds. Frames older than ten seconds are unavailable rather than displayed as
+live. Images and video are **not currently archived in SQLite or on disk**.
+Frame timestamps are gateway receive times, not verified camera exposure times.
+
+
 
 Implementation baseline: Mosquitto for MQTT, Python for ingestion and the web
 service, SQLite for storage, and HTML/CSS/JavaScript for the dashboard. Keep one
@@ -64,9 +83,9 @@ clients. The router carries the network traffic; the broker runs on the Jetson.
    to `clam/node_01/telemetry` on the broker at `192.168.88.250:1883`.
 3. The Jetson receiver subscribes to `clam/+/telemetry` (`+` matches one node
    topic level), so additional nodes can use the same receiver.
-4. The receiver will validate and store messages and gateway receive timestamps
-   in SQLite. The web service will expose the stored readings to the dashboard.
-5. Browsers will access the web service over HTTP; MQTT credentials stay out of
+4. The receiver validates and stores messages and gateway receive timestamps
+   in SQLite. The web service exposes the stored readings to the dashboard.
+5. Browsers access the web service over HTTP; MQTT credentials stay out of
    frontend code.
 
 The broker is a message relay, not the measurement database or dashboard.
@@ -74,10 +93,9 @@ MQTT delivery does not by itself prove a sample was saved. Node 01 also publishe
 connection status to `clam/node_01/status`; sensor quality is a separate field
 in telemetry. See [gateway setup](gateway/README.md) for commissioning commands.
 
-**Progress (2026-11-06):** the owner confirmed Mosquitto is active and enabled at
-boot after reinstalling Jetson. MQTT account/listener setup and Node 01 delivery are confirmed by two subscriber
-messages. The Python/SQLite recorder and dashboard are implemented locally; follow
-[dashboard setup](docs/dashboard_setup.md) to deploy and verify on Jetson.
+The MQTT broker, Python/SQLite recorder, and HTTP dashboard are deployed on the
+Jetson. Nodes 01, 02, and 05 use the same ingestion path. A successful connection
+does not establish measurement accuracy; retain each node's quality flags.
 
 ### Which password is which?
 
@@ -101,16 +119,16 @@ messages automatically. Neither requires keeping the ESP32 attached to the Mac.
 
 Node numbers follow this project's sensor plan, not the older shrimp project's
 numbering. One ESP32 node means one independently flashed board. A camera is a
-separate acquisition device; slot 06 is reserved without assuming an ESP32.
+separate Ethernet acquisition device in slot 06; it does not use an ESP32.
 
 | Slot / device ID | Measurement | Current state |
 | --- | --- | --- |
-| 01 / `node_01` | Dissolved oxygen + temperature; saturation if supported | First implementation; confirm actual board and probe |
-| 02 / `node_02` | ORP + temperature if supported | Planned |
+| 01 / `node_01` | Dissolved oxygen + temperature; saturation if supported | Live telemetry and dashboard; calibration/compensation unverified |
+| 02 / `node_02` | ORP + temperature (SEN0709) | Live telemetry and dashboard; calibration/compensation unverified |
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
-| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity (Atlas EZO-EC, K10 probe) | Firmware 0.1.1; USB EC responses, Wi-Fi and NTP verified; MQTT pending |
-| 06 / `camera_06` | RGB images | Reserved; interface and hardware to confirm |
+| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity + estimated salinity (Atlas EZO-EC, K10) | Firmware 0.1.4; MQTT and dashboard verified; calibration/compensation unverified |
+| 06 / [`camera_06`](docs/camera_setup.md) | RGB images (Barlus IPC5MPIR-PBX10) | Live preview implemented; new-IP stream recovery pending verification |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 
 Flow, level, and fluorescence have been discussed but are not assigned to
@@ -136,11 +154,12 @@ use DHCP.
 | Node 03 | `192.168.88.103` | Planned |
 | Node 04 | `192.168.88.104` | Planned |
 | Node 05 | `192.168.88.105` | Planned; identified MAC `44:1B:F6:FE:71:50`, reservation pending |
-| Slot 06 / camera | `192.168.88.106` | Reserved in plan; camera network configuration pending |
+| Slot 06 / camera | `192.168.88.106` | Static IP configured on camera; MAC `00:12:35:02:DF:76`; router DHCP exclusion/reservation pending |
 | Node 07 | `192.168.88.107` | Planned |
 
-The Jetson reservation is `192.168.88.250`; its active address is owner-confirmed; broker service
-still needs verification. Check leases and existing static assignments before
+The Jetson reservation is `192.168.88.250`; gateway and broker operation have been
+verified. Camera 06 uses a camera-configured static IP, rather than board DHCP.
+Reserve/exclude `.106` in the router DHCP configuration to prevent a future conflict. Check leases and existing static assignments before
 allocating each remaining node address. Node 01's previous dynamic address was
 `.253`; no firmware change is needed for the new router reservation.
 
@@ -181,7 +200,9 @@ gateway/                           Python MQTT receiver, SQLite storage, HTTP se
 web/                               HTML/CSS/JavaScript monitoring dashboard
 ```
 
-The camera's implementation folder will follow its confirmed hardware type.
+Camera decoding is implemented in `gateway/camera.py`; see
+[Camera 06 setup](docs/camera_setup.md). Its private RTSP URL stays in
+`gateway/.env` and is never sent to the browser.
 Directory `monitoring_nodes/node_01` matches data identity `node_01`. Keep each node's exact
 parts, wiring, firmware settings, build/upload steps, and verification results
 together. Do not copy the old project's logs, secrets, board MACs, or databases.
@@ -201,9 +222,12 @@ retransmitted samples. Missing or invalid measurements remain missing, not zero.
 Mark chart gaps and stale values. Network recovery must not manufacture samples
 for an outage; offline buffering guarantees will be documented when implemented.
 
-The dashboard will use an English, dark industrial monitoring layout with clear
-typography, restrained accent colors, and responsive charts. Its first view must
-show Node 01 values, units, recent trends, last update time, and connectivity.
+The dashboard uses English, a white background, deep blue text, Calibri with
+system fallbacks, and responsive charts. Overview groups chemical properties,
+physical properties, and image information. Sidebar pages provide sensor trends,
+source temperatures and their valid-reading average, RGB preview, IP & MAC
+records, and a prediction-results placeholder. No trained LSTM or hourly
+inference task is deployed yet.
 Do not use color alone for status. Demo data, if used during UI development,
 must be visibly labeled and kept separate from real measurements.
 
@@ -231,13 +255,15 @@ and add durable buffering before unattended research recording.
 
 ## Later milestones
 
-- Commission ORP, pH, turbidity, and the remaining confirmed instruments.
-- Integrate camera images with timestamps and measurement-location metadata.
+- Complete calibration verification and commission pH, turbidity, and remaining instruments.
+- Add timestamped image archiving and align images with sensor sampling windows.
 - Record paired laboratory BOD₅ samples by sampling time/window and sample ID.
 - Compare sensor-only and multimodal BOD₅ models on held-out dates/batches.
-- Add separately specified controls and VT branding.
+- Add separately specified controls when the monitoring phase is complete.
 
 ## References
+
+- [Camera 06 setup](docs/camera_setup.md): network, ONVIF/RTSP acquisition, preview, and recovery.
 
 - [hardware_record_tank](https://github.com/LihongYang99/hardware_record_tank):
   reference implementation, not a drop-in configuration for this site.
