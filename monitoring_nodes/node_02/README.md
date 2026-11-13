@@ -14,14 +14,16 @@ power and grounding arrangement. Never connect 12 V to an ESP32 5 V pin.
 
 `firmware/node_02_orp` polls address 1 at 4800 baud, 8N1 every five seconds.
 Normal acquisition uses Modbus function 03: signed ORP mV and signed temperature / 10.
-Firmware 0.1.2 additionally supports explicit USB-only function 16 calibration writes.
+Firmware 0.1.3 includes explicit USB-only function 16 calibration writes and
+reply diagnostics. Calibration writes are currently on hold; see the review below.
 CRC or frame errors produce null readings, not zero. Calibration is UNVERIFIED.
 Protocol reference: https://wiki.dfrobot.com/sen0709/docs/23382
 
 Copy `arduino_secrets.example.h` to `arduino_secrets.h` and fill Wi-Fi settings.
 The local file is Git-ignored. NTP uses Jetson `192.168.88.250`.
-MQTT remains disabled until a separate Node 02 account and broker ACL are ready.
-Do not reuse Node 01 credentials. Prepared topics are `clam/node_02/telemetry`
+On a new installation, MQTT stays disabled until the Node 02 account and broker
+ACL are ready. This deployment has already delivered Node 02 telemetry.
+Do not reuse Node 01 credentials. Topics are `clam/node_02/telemetry`
 and `clam/node_02/status`; gateway/dashboard integration is available below.
 
 ## Compile and upload on Mac
@@ -86,7 +88,7 @@ systemctl is-active mosquitto clam-gateway
 
 The existing broker password file and gateway `.env` must be preserved.
 
-## Manual ORP calibration (USB, firmware 0.1.2)
+## Historical ORP calibration procedure (USB, firmware 0.1.2)
 
 **Calibration writes are on hold after an undocumented reply in firmware 0.1.3.**
 See the [calibration review](calibration_review.md) before following the steps below.

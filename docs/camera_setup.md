@@ -3,6 +3,8 @@
 Barlus IPC5MPIR-PBX10 connects to a router LAN port (currently port 4).
 Current camera address: `192.168.88.106/24`; MAC: `00:12:35:02:DF:76`.
 Configured on the camera through ONVIF SetNetworkInterfaces (eth0, DHCP off).
+The address change was applied on November 12, 2026. The private stream URI
+was updated, but post-change stream recovery remains unverified.
 The camera no longer requires the Jetson's temporary `192.168.1.200` address.
 Reserve/exclude `.106` in the router DHCP configuration to prevent future conflicts.
 
@@ -18,7 +20,8 @@ Receive time is not a verified camera exposure timestamp.
 
 The RGB camera page refreshes every two seconds. Frames expire after ten
 seconds; connection failures trigger automatic retries. The overview shows
-camera availability. MQTT sensor collection remains independent.
+a small clickable preview and camera availability. MQTT sensor collection
+remains independent. Images are not archived in SQLite or on disk.
 
 After syncing gateway changes:
 

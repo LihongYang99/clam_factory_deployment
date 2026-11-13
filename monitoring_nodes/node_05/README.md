@@ -1,4 +1,11 @@
-# Node 05 — electrical conductivity
+# Node 05 — electrical conductivity and estimated salinity
+
+**Current implementation:** firmware 0.1.4 publishes EC and estimated salinity;
+see [EC and estimated salinity](#ec-and-estimated-salinity-firmware-014).
+Calibration and compensation remain UNVERIFIED. The planned `.105` DHCP
+reservation is still pending; `.97` was last observed on November 12, 2026.
+
+## November 11 commissioning and calibration record
 
 Atlas Scientific EZO-EC over UART, with a physical **K10 probe confirmed by the
 operator**. Read-only identification confirmed an **ESP32-S3 v0.2 with 16 MB
@@ -15,7 +22,7 @@ and API sequence 18 matched at 3.22 µS/cm; Chrome displayed EC on both the
 overview and detail page, with history and `UNVERIFIED` quality labels.
 Node 01 and Node 02 continued reporting after deployment.
 
-The `.105` DHCP reservation remains pending; the board currently uses `.97`.
+At this checkpoint, the `.105` DHCP reservation was pending and the board used `.97`.
 The latest read-only `CAL STATUS` confirmed mode OFF, K10, compensation setting
 25°C, and stored EZO calibration mode 2. No calibration or temperature commands
 were written during this deployment. Readings ranged from 0 to 8.04 µS/cm in

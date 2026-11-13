@@ -1,7 +1,10 @@
 # Run the recorder and dashboard
 
-The gateway is one Python process: Paho subscribes to MQTT, SQLite stores the
-original JSON and gateway receive time, and a read-only HTTP server serves `web/`.
+The gateway service subscribes to MQTT with Paho, stores original JSON and
+gateway receive time in SQLite, and serves `web/` through a read-only HTTP server.
+When a camera URI is configured, a separate system-Python worker decodes RTSP
+with GStreamer; see [camera setup](camera_setup.md). Camera previews use
+`/api/camera` and `/camera.jpg`, independently of sensor MQTT ingestion.
 No frontend build, Node.js, external fonts, or internet connection is needed at
 runtime. Install Python dependencies once while internet access is available.
 
@@ -48,7 +51,7 @@ In the **Jetson SSH terminal**:
 
 ```bash
 cd ~/clam_factory_deployment
-sudo apt install python3-venv
+sudo apt install python3-venv nano
 python3 -m venv .venv
 .venv/bin/pip install -r gateway/requirements.txt
 cp -n gateway/.env.example gateway/.env
@@ -142,7 +145,7 @@ Local checks:
 python3 -m unittest discover -s gateway/tests -v
 ```
 
-Current validation: nine storage/API tests passed. On November 11, 2026, the
+Storage/API checks are available through the command above. On November 11, 2026, the
 updated gateway was deployed to Jetson and actual Node 05 EC samples were
 verified through USB, MQTT delivery, SQLite, the API, and Chrome's overview and
 conductivity detail page. Node 01 and Node 02 continued reporting. Calibration

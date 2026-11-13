@@ -30,8 +30,8 @@ and [camera setup](docs/camera_setup.md) for operation and troubleshooting.
 - Preserve real readings and expose disconnected, stale, and invalid states.
 
 Actuator control and trained BOD prediction are later milestones. The dashboard
-already includes VT and company branding and a prediction-results placeholder. Phase 1
-does not include pump, valve, heater, or remote sampling-control interfaces.
+already includes VT and company branding and a prediction-results placeholder.
+Phase 1 does not include pump, valve, heater, or remote sampling-control interfaces.
 
 ## Architecture
 
@@ -61,12 +61,11 @@ seconds. Frames older than ten seconds are unavailable rather than displayed as
 live. Images and video are **not currently archived in SQLite or on disk**.
 Frame timestamps are gateway receive times, not verified camera exposure times.
 
-
-
 Implementation baseline: Mosquitto for MQTT, Python for ingestion and the web
 service, SQLite for storage, and HTML/CSS/JavaScript for the dashboard. Keep one
-gateway codebase that can also be debugged on macOS. Add dependencies only when
-needed for an implemented feature.
+gateway codebase for telemetry and web development on macOS and deployment on
+Jetson. Camera decoding uses the Jetson system Python and GStreamer bindings.
+Add dependencies only when needed for an implemented feature.
 
 The Jetson must remain powered on for central recording and dashboard access.
 The Mac does not need to remain attached to a sensor board. Internet access is
@@ -103,10 +102,10 @@ does not establish measurement accuracy; retain each node's quality flags.
 | --- | --- |
 | Wi-Fi password | Connect ESP32 to the router's wireless network |
 | Jetson login password | SSH login and `sudo` as the Linux user `lihong` |
-| MQTT `clam_node_01` password | Authenticate the ESP32 to Mosquitto; planned ACL allows publishing its own telemetry/status |
-| MQTT `clam_gateway` password | Authenticate the receiver to Mosquitto; planned ACL allows reading node telemetry/status |
+| MQTT `clam_node_01`, `clam_node_02`, or `clam_node_05` password | Authenticate the corresponding ESP32; each account may publish only its own telemetry/status |
+| MQTT `clam_gateway` password | Authenticate the receiver; its ACL permits reading node telemetry/status |
 
-The two MQTT accounts are broker accounts, not Linux login accounts. Set new,
+These MQTT accounts are broker accounts, not Linux login accounts. Set new,
 separate MQTT passwords when prompted by `mosquitto_passwd`. A preceding
 `[sudo] password for lihong:` prompt still asks for the Jetson login password.
 Account permissions take effect after the broker authentication and ACL files
@@ -123,12 +122,12 @@ separate Ethernet acquisition device in slot 06; it does not use an ESP32.
 
 | Slot / device ID | Measurement | Current state |
 | --- | --- | --- |
-| 01 / `node_01` | Dissolved oxygen + temperature; saturation if supported | Live telemetry and dashboard; calibration/compensation unverified |
-| 02 / `node_02` | ORP + temperature (SEN0709) | Live telemetry and dashboard; calibration/compensation unverified |
+| 01 / [node_01](monitoring_nodes/node_01/README.md) | Dissolved oxygen + temperature + oxygen saturation (SEN0681) | Live telemetry and dashboard; calibration/compensation unverified |
+| 02 / [node_02](monitoring_nodes/node_02/README.md) | ORP + temperature (SEN0709) | Live telemetry and dashboard; calibration/compensation unverified |
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
-| 05 / [`node_05`](monitoring_nodes/node_05/README.md) | Electrical conductivity + estimated salinity (Atlas EZO-EC, K10) | Firmware 0.1.4; MQTT and dashboard verified; calibration/compensation unverified |
-| 06 / [`camera_06`](docs/camera_setup.md) | RGB images (Barlus IPC5MPIR-PBX10) | Live preview implemented; new-IP stream recovery pending verification |
+| 05 / [node_05](monitoring_nodes/node_05/README.md) | Electrical conductivity + estimated salinity (Atlas EZO-EC, K10) | Firmware 0.1.4; MQTT and dashboard verified; calibration/compensation unverified |
+| 06 / [camera_06](docs/camera_setup.md) | RGB images (Barlus IPC5MPIR-PBX10) | Live preview implemented; new-IP stream recovery pending verification |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 
 Flow, level, and fluorescence have been discussed but are not assigned to
@@ -147,7 +146,7 @@ Agreed node addressing: `192.168.88.(100 + node number)`. Configure each
 reservation on the router as its board is commissioned; firmware continues to
 use DHCP.
 
-| Device | Reserved / planned address | Status |
+| Device | Assigned / planned address | Status |
 | --- | --- | --- |
 | Node 01 | `192.168.88.101` | Active lease verified in WebFig after board reset (2026-11-04) |
 | Node 02 | `192.168.88.102` | Confirmed in serial diagnostics (2026-11-10) |
@@ -159,9 +158,12 @@ use DHCP.
 
 The Jetson reservation is `192.168.88.250`; gateway and broker operation have been
 verified. Camera 06 uses a camera-configured static IP, rather than board DHCP.
-Reserve/exclude `.106` in the router DHCP configuration to prevent a future conflict. Check leases and existing static assignments before
-allocating each remaining node address. Node 01's previous dynamic address was
-`.253`; no firmware change is needed for the new router reservation.
+Reserve/exclude `.106` in the router DHCP configuration to prevent a future
+conflict. Node 05 was last observed at dynamic address `192.168.88.97` on
+November 12, 2026; `.105` is not yet confirmed. Check leases and existing static
+assignments before allocating each remaining node address. Node 01's previous
+dynamic address was `.253`; no firmware change is needed for the new router
+reservation.
 
 See [LAN address reservations](docs/network_setup.md) for the WebFig steps,
 why a board reset helps, and how to verify the active address.
@@ -182,34 +184,39 @@ the broker address may require updating firmware configuration.
 Both wired and wireless clients must be able to reach the gateway. A shared VT
 campus uplink does not establish LAN reachability: verify the actual subnet,
 client isolation, and broker/web access. Confirm the router's 2.4 GHz sensor
-Wi-Fi configuration. Initial access is LAN-only, with no public port forwarding.
-Use authenticated MQTT; keep Wi-Fi and broker credentials out of Git.
+Wi-Fi configuration. The web service listens on the project LAN, with no public
+port forwarding. For home access, use the VT VPN and an SSH tunnel through the
+Jetson's campus address, opening `http://localhost:8001` on the Mac; see
+[connection tips](tips.md). Use authenticated MQTT and keep credentials out of Git.
 
 ## Repository organization
 
-Create each implementation directory when its first working component is added:
+Implemented components are organized as follows; add other node directories
+when their hardware is commissioned:
 
 ```text
-README.md                          Overall architecture, node map, milestone status
+README.md                          Architecture, node map, and milestone status
 monitoring_nodes/
-  node_01/README.md                Node 01 hardware and commissioning notes (present)
-  node_01/firmware/node_01_do/     DO-only Arduino sketch and configuration template
-  node_01/tests/                   Host-side sensor protocol checks
-  node_02/ ... node_07/            Add node folders as hardware is commissioned
-gateway/                           Python MQTT receiver, SQLite storage, HTTP service
-web/                               HTML/CSS/JavaScript monitoring dashboard
+  node_01/                        DO firmware, protocol tests, and commissioning guide
+  node_02/                        ORP firmware, protocol tests, and commissioning guide
+  node_05/                        EC/salinity firmware, tests, and commissioning guide
+gateway/                          MQTT receiver, SQLite storage, and HTTP service
+  camera.py                       RTSP acquisition and latest-JPEG worker
+web/                              HTML/CSS/JavaScript monitoring dashboard
+docs/                             Network, dashboard, camera, and prediction guides
+tips.md                           Everyday commands and remote-access instructions
 ```
 
 Camera decoding is implemented in `gateway/camera.py`; see
 [Camera 06 setup](docs/camera_setup.md). Its private RTSP URL stays in
 `gateway/.env` and is never sent to the browser.
-Directory `monitoring_nodes/node_01` matches data identity `node_01`. Keep each node's exact
-parts, wiring, firmware settings, build/upload steps, and verification results
-together. Do not copy the old project's logs, secrets, board MACs, or databases.
+Directory `monitoring_nodes/node_01` matches data identity `node_01`. Keep each
+node's exact parts, wiring, firmware settings, build/upload steps, and
+verification results together. Do not copy the old project's logs, secrets, board MACs, or databases.
 
 ## Data and dashboard requirements
 
-The first implementation should preserve:
+The sensor data contract preserves:
 
 - Node ID, sensor model, firmware version, boot ID, and sequence number.
 - Sample UTC when synchronized; otherwise `null` with an explicit unsynchronized
@@ -226,8 +233,10 @@ The dashboard uses English, a white background, deep blue text, Calibri with
 system fallbacks, and responsive charts. Overview groups chemical properties,
 physical properties, and image information. Sidebar pages provide sensor trends,
 source temperatures and their valid-reading average, RGB preview, IP & MAC
-records, and a prediction-results placeholder. No trained LSTM or hourly
-inference task is deployed yet.
+records, and a prediction-results placeholder for DO, ORP, and source-specific
+temperatures 12 hours ahead. The intended prediction cadence is hourly; no
+trained LSTM or hourly inference task is deployed yet. BOD₅ estimation remains
+a separate research milestone.
 Do not use color alone for status. Demo data, if used during UI development,
 must be visibly labeled and kept separate from real measurements.
 
@@ -264,14 +273,14 @@ and add durable buffering before unattended research recording.
 ## References
 
 - [Camera 06 setup](docs/camera_setup.md): network, ONVIF/RTSP acquisition, preview, and recovery.
-
 - [hardware_record_tank](https://github.com/LihongYang99/hardware_record_tank):
   reference implementation, not a drop-in configuration for this site.
-- [Node 01 preparation](monitoring_nodes/node_01/README.md).
+- [Node 01 commissioning](monitoring_nodes/node_01/README.md).
+- [Node 02 commissioning](monitoring_nodes/node_02/README.md): ORP acquisition and calibration troubleshooting.
 - [Node 05 EC commissioning](monitoring_nodes/node_05/README.md): UART wiring,
   board identification, build/upload, MQTT account, and verification.
 - [DFRobot SEN0681 protocol](https://wiki.dfrobot.com/sen0681/docs/21674):
-  candidate DO sensor inherited from the earlier hardware records.
+  installed DO probe model confirmed by the operator.
 
 The older project used different node assignments and had different deployment
 requirements. This project's agreed gateway is the Jetson Orin Nano.

@@ -4,26 +4,28 @@
 **Scope:** read DO and temperature, then publish measurements over Wi-Fi to the
 Jetson gateway. No ORP channel or actuator control on this board.
 
-**Status:** v0.1.3 runtime confirmed by user-provided serial logs: UART0 console,
+**Initial bench checkpoint (November 6, 2026):** v0.1.3 runtime confirmed by user-provided serial logs: UART0 console,
 Wi-Fi connection, DHCP address, and 5-second polling are working. Sensor reads
-now report OK with DO, saturation, and temperature; sample UTC is UNSYNCED;
+reported OK with DO, saturation, and temperature; sample UTC was UNSYNCED;
 MQTT delivery to Jetson was verified by two subscriber messages on 2026-11-06
 (see [gateway verification](../../gateway/README.md#verified-node-01-reception--2026-11-06)).
 WebFig confirms the active lease is `192.168.88.101` after board reset
 (2026-11-04). Sensor values reach the Jetson broker; calibration and compensation remain
-unverified. Database recording and the dashboard are pending.
+unverified. Database recording and the dashboard were subsequently deployed;
+see the [current project status](../../README.md).
 See [LAN address reservations](../../docs/network_setup.md) for setup and verification.
 The instructions below target ESP32-S3 N16R8 + SEN0681; stop if your labels differ.
 
 ## Hardware to identify
 
 Board, probe, and converter models below come from the earlier shrimp project
-and still require label verification. Power details were reported by the owner.
+and require verification where marked below. The operator confirmed the SEN0681
+probe model and reported the power details.
 
 | Part | Reference model | New-project verification |
 | --- | --- | --- |
 | Board | ESP32-S3 N16R8 | Confirm board label and USB port |
-| DO probe | DFRobot SEN0681 | Confirm exact model |
+| DO probe | DFRobot SEN0681 | Model confirmed by operator |
 | Serial converter | Waveshare TTL TO RS485 (B), 23778 | Confirm variant and terminal labels |
 | External power supply | 12 V DC, 5 A rated output | Owner-reported; exact model and distribution wiring pending |
 | Board supply | Regulated 5 V through the board 5V and GND pins | Owner-reported; source of the 5 V rail pending |
@@ -52,7 +54,7 @@ Before connecting USB for flashing while external 5 V is present, verify the
 board's power-selection/backfeed protection; otherwise disconnect external board
 power for USB debugging. Switch power off before changing wiring.
 
-## Candidate SEN0681 protocol
+## SEN0681 protocol
 
 Checked against the [manufacturer protocol](https://wiki.dfrobot.com/sen0681/docs/21674)
 on 2026-11-04. These settings apply only if the installed probe is SEN0681 and

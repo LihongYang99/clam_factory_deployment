@@ -5,17 +5,19 @@ frontend build step. Follow [dashboard setup](../docs/dashboard_setup.md) to
 configure the Jetson receiver and open `http://192.168.88.250:8000`.
 
 The page polls `/api/node_01`, `/api/node_02`, `/api/node_05`, and `/api/predictions`
-every five seconds and shows DO, ORP, electrical conductivity, source-specific temperatures, oxygen saturation,
+every five seconds and shows DO, ORP, electrical conductivity, estimated salinity,
+source-specific temperatures, oxygen saturation,
 sample quality, receive age, 15-minute/one-hour history, and an
-accessible table of recent samples. Pause display pauses browser polling only;
-the recorder continues collecting. No simulated values are included.
+accessible table of recent samples. Pause display freezes sensor and prediction
+updates in the browser; the recorder continues collecting. The camera refreshes
+independently every two seconds. No simulated values are included.
 
 Charts use gateway receive time; node UTC is not invented when unsynchronized.
 Old readings remain visible with stale/disconnected labels. Sensor errors are
 separate from reception freshness. The browser never receives MQTT credentials.
 
 Design: white workspace, deep blue text, restrained blue curve, amber quality
-notice, local system fonts, visible keyboard focus and responsive layout. No
+notice, Calibri with system fallbacks, visible keyboard focus and responsive layout. No
 control actions or BOD predictions are included in this version.
 
 Chrome rendering was checked at 1440, 900, and 390 pixels wide with isolated test
@@ -59,8 +61,9 @@ on small screens it becomes a horizontally scrollable navigation strip.
 The Temperature navigation entry compares the temperature modules in connected
 probes. Source-specific readings and history remain available from the overview
 and each probe link.
-Other entries describe planned devices and never display invented readings or
-camera images. Hash links support browser back/forward and direct detail links.
+RGB camera opens the live preview, also shown as a small Overview thumbnail;
+see [camera setup](../docs/camera_setup.md). Unintegrated devices show their
+planned state without invented readings. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
 
 Select **IP & MAC** in the sidebar (`#network`) for the router, Jetson and node
@@ -82,6 +85,11 @@ comparison and prediction sources retain their source IPs for troubleshooting.
 or invalid readings remain blank; stale or disconnected readings retain their
 status. No accuracy band is shown because a verified probe specification has
 not been supplied.
+
+The same detail page displays EZO-derived estimated salinity from `salinity_psu`:
+a dashed orange line on the right axis (0–42 PSU), alongside the solid teal EC
+line on the left. Both come from the same probe. Older samples without salinity
+remain missing; neither calibration nor compensation is verified.
 
 The EZO-EC does not measure water temperature. Its optional `probe_k` and
 `compensation_temperature_c` fields are configuration settings, not additional

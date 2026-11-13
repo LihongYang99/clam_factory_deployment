@@ -18,10 +18,12 @@ individual measurement details. Support a future multimodal BOD prediction study
 
 ## Capabilities and Constraints
 
-Monitoring only in the first phase. Node 01 supplies dissolved oxygen,
-temperature and oxygen saturation. Other devices in the README node map are
-planned; no readings, images, operating limits or verified calibration may be
-invented. Temperature and DO share Node 01.
+Monitoring only in the first phase. Node 01 supplies DO, temperature, and oxygen
+saturation; Node 02 supplies ORP and temperature; Node 05 supplies EC and estimated
+salinity. Camera 06 supplies RGB previews through a separate RTSP path. Remaining
+devices are planned. No readings, images, operating limits, forecasts, or verified
+calibration may be invented. The prediction page is a placeholder for future
+hourly, 12-hour-ahead DO, ORP, and source-temperature results.
 
 The overview groups temperature, turbidity and electrical conductivity under physical properties;
 DO, ORP, pH and UV254 under chemical properties; RGB under image information.
@@ -38,12 +40,15 @@ commissioning and troubleshooting.
 ## Brand Commitments
 
 English interface. Preserve the title “Clam processing water quality dashboard”
-and the owner-provided Virginia Tech BSE logo.
+and the owner-provided Virginia Tech BSE and Bumble Bee Seafood Company logos.
+Use Calibri with system fallbacks.
 
 ## Evidence on Hand
 
-Node 01 telemetry has been received through MQTT. Calibration and compensation
-remain unverified. No camera feed is available. See README.md for the node map.
+Nodes 01, 02, and 05 have delivered telemetry through MQTT to the dashboard.
+Calibration and compensation remain unverified. Real camera frames were displayed
+before the November 12 address change; stream recovery at the new address is
+pending verification. See README.md for the current node map and deployment status.
 
 Owner-approved visual direction: white background, deep blue text, simple sans-serif
 type and a small clam outline. Temperature readings must stay identifiable by

@@ -1,11 +1,10 @@
 # Jetson MQTT gateway
 
-First milestone: receive Node 01 telemetry on Jetson `192.168.88.250`.
-Owner-provided output on 2026-11-06 confirms Mosquitto is active, enabled at
-boot, and listening on `192.168.88.250:1883`. Node 01 publishing and gateway subscription were verified with two actual
-telemetry messages (sequences 33 and 34, five seconds apart). Negative ACL and
-anonymous-access tests remain pending. The recorder, API, and dashboard are now implemented locally;
-see [dashboard setup](../docs/dashboard_setup.md) for deployment and validation.
+Mosquitto listens on Jetson `192.168.88.250:1883`. Nodes 01, 02, and 05 have
+delivered real telemetry to the deployed recorder, API, and dashboard. Calibration
+and compensation remain unverified. Negative ACL and anonymous-access tests
+remain pending. See [dashboard setup](../docs/dashboard_setup.md) for deployment
+and validation, and the dated first-node checkpoint below for historical evidence.
 
 ## Node 05 conductivity integration
 
@@ -13,7 +12,9 @@ The gateway accepts schema 1 telemetry on `clam/node_05/telemetry` for the Atlas
 `EZO-EC` UART circuit. Its only required measurement is `conductivity_us_cm` in
 µS/cm: a finite, nonnegative number when `sensor_status=OK`, or `null` for sensor
 errors. Zero is a valid reading. The API at `/api/node_05?minutes=15` (or `60`)
-keeps its samples separate from Node 01 and Node 02.
+keeps its samples separate from Node 01 and Node 02. Optional `salinity_psu`
+contains EZO-derived estimated salinity from 0–42 PSU. Older samples may omit it;
+missing or out-of-range firmware output remains null, not a synthesized value.
 
 The circuit does not measure water temperature. Optional
 `compensation_temperature_c` records its compensation **setting**, not a probe
@@ -55,7 +56,7 @@ existing installation, inspect `/etc/mosquitto/mosquitto.conf` and
 `/etc/mosquitto/conf.d/` for other listeners, authentication, or existing projects.
 Do not replace a shared broker configuration without reconciling it.
 
-## 2. Create accounts (Jetson)
+## 2. Create the first-node and receiver accounts (Jetson)
 
 Use separate, new passwords. Enter them at the prompts; do not put passwords in
 Git, screenshots, or chat. The node password must also go in its local firmware
@@ -69,7 +70,9 @@ sudo chown root:mosquitto /etc/mosquitto/clam.passwd
 sudo chmod 640 /etc/mosquitto/clam.passwd
 ```
 
-No `-c` flag is used: it would overwrite an existing password file.
+No `-c` flag is used: it would overwrite an existing password file. Add Node 02
+using its [commissioning guide](../monitoring_nodes/node_02/README.md) and Node 05
+using the integration section above. Each board needs its own broker account.
 
 ## 3. Install configuration (Jetson)
 
@@ -180,7 +183,9 @@ Verify all of the following:
   `-u` and `-P` must report an authorization failure.
 
 `clock_status=UNSYNCED` remains a separate clock issue. A successful MQTT receipt
-is not database storage; this milestone does not yet save telemetry or serve a page.
+is not proof of database storage: `mosquitto_sub` only displays messages. The
+separate gateway service records and serves them; verify it using
+[dashboard setup](../docs/dashboard_setup.md).
 
 References: [Mosquitto authentication](https://mosquitto.org/documentation/authentication-methods/)
 and [password utility](https://www.mosquitto.org/man/mosquitto_passwd-1.html).
@@ -195,6 +200,6 @@ uptimes 161002 and 166002 ms. DO was 6.1542 and 6.1494 mg/L; temperature was
 `not_forwarded_before_sample` stayed at 27: this is the accumulated count of
 earlier failed forwarding attempts, not 27 new failures per message. There is
 no offline replay queue. Two received messages verify the current acquisition
-and MQTT path, not long-term reliability. Sample UTC remains null/UNSYNCED;
-calibration and compensation remain UNVERIFIED. At that verification point, no database recorder or dashboard was running.
-The new implementation still needs live Jetson verification.
+and MQTT path at that checkpoint, not long-term reliability. Those samples had
+null/UNSYNCED sample UTC and UNVERIFIED calibration/compensation. No database
+recorder or dashboard was running at that time; both were deployed afterward.
