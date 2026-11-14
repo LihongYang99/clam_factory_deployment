@@ -61,8 +61,11 @@ on small screens it becomes a horizontally scrollable navigation strip.
 The Temperature navigation entry compares the temperature modules in connected
 probes. Source-specific readings and history remain available from the overview
 and each probe link.
-RGB camera opens the live preview, also shown as a small Overview thumbnail;
-see [camera setup](../docs/camera_setup.md). Unintegrated devices show their
+RGB camera opens the live preview, also shown as a small Overview thumbnail.
+Live JPEG delivery at camera address `192.168.88.106` was verified on November 14,
+2026; see [camera setup](../docs/camera_setup.md) for the checks and remaining
+validation. This dated check does not override the live availability indicator.
+Unintegrated devices show their
 planned state without invented readings. Hash links support browser back/forward and direct detail links.
 Technical acquisition information is collapsed in the detail view.
 

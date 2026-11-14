@@ -7,13 +7,13 @@ laboratory BOD₅ from water-quality measurements, images, and process context.
 **Current milestone:** operate a shared monitoring dashboard for sensor telemetry
 and live camera previews on the Jetson Orin Nano.
 
-**Status (updated November 13, 2026):** Node 01 DO/temperature, Node 02
+**Status (updated November 14, 2026):** Node 01 DO/temperature, Node 02
 ORP/temperature, and Node 05 EC/estimated salinity have delivered real telemetry
 to the deployed gateway and dashboard. Calibration and compensation remain
 unverified. Camera 06 has supplied real images to the RGB camera page and the
 Overview preview. Its static address was changed to `192.168.88.106` on November
-12; the gateway stream configuration was updated, and a service restart was
-requested. Post-change stream recovery has not yet been verified.
+12. On November 14, the gateway configuration and live JPEG responses at the
+new address were verified; successive frame timestamps advanced.
 
 See [dashboard setup](docs/dashboard_setup.md), [MQTT setup](gateway/README.md),
 and [camera setup](docs/camera_setup.md) for operation and troubleshooting.
@@ -127,7 +127,7 @@ separate Ethernet acquisition device in slot 06; it does not use an ESP32.
 | 03 / `node_03` | pH | Planned |
 | 04 / `node_04` | Turbidity | Planned |
 | 05 / [node_05](monitoring_nodes/node_05/README.md) | Electrical conductivity + estimated salinity (Atlas EZO-EC, K10) | Firmware 0.1.4; MQTT and dashboard verified; calibration/compensation unverified |
-| 06 / [camera_06](docs/camera_setup.md) | RGB images (Barlus IPC5MPIR-PBX10) | Live preview implemented; new-IP stream recovery pending verification |
+| 06 / [camera_06](docs/camera_setup.md) | RGB images (Barlus IPC5MPIR-PBX10) | Live JPEG preview verified at new IP on November 14, 2026 |
 | 07 / `node_07` | UV254 / optical COD proxy | Provisional; hardware not selected |
 
 Flow, level, and fluorescence have been discussed but are not assigned to

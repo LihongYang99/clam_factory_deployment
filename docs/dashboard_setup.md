@@ -5,6 +5,9 @@ gateway receive time in SQLite, and serves `web/` through a read-only HTTP serve
 When a camera URI is configured, a separate system-Python worker decodes RTSP
 with GStreamer; see [camera setup](camera_setup.md). Camera previews use
 `/api/camera` and `/camera.jpg`, independently of sensor MQTT ingestion.
+Live JPEG delivery from Camera 06 at `192.168.88.106` was verified on November 14,
+2026. The [camera verification record](camera_setup.md#verification-on-november-14-2026)
+describes the three fresh-frame checks and their limits.
 No frontend build, Node.js, external fonts, or internet connection is needed at
 runtime. Install Python dependencies once while internet access is available.
 

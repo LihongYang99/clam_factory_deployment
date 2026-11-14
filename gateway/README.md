@@ -6,6 +6,14 @@ and compensation remain unverified. Negative ACL and anonymous-access tests
 remain pending. See [dashboard setup](../docs/dashboard_setup.md) for deployment
 and validation, and the dated first-node checkpoint below for historical evidence.
 
+## Camera integration
+
+Camera 06 sends RTSP over Ethernet independently of MQTT. The camera worker
+serves its latest fresh JPEG through `/camera.jpg`, with status at `/api/camera`.
+The configured camera host `192.168.88.106` and fresh image delivery were verified
+on November 14, 2026. No service restart or code change was needed for that check.
+See [camera setup](../docs/camera_setup.md) for the verification record.
+
 ## Node 05 conductivity integration
 
 The gateway accepts schema 1 telemetry on `clam/node_05/telemetry` for the Atlas

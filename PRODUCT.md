@@ -46,9 +46,11 @@ Use Calibri with system fallbacks.
 ## Evidence on Hand
 
 Nodes 01, 02, and 05 have delivered telemetry through MQTT to the dashboard.
-Calibration and compensation remain unverified. Real camera frames were displayed
-before the November 12 address change; stream recovery at the new address is
-pending verification. See README.md for the current node map and deployment status.
+Calibration and compensation remain unverified. Live camera JPEG delivery at
+`192.168.88.106` was verified on November 14, 2026, with advancing frame timestamps
+and a visually inspected laboratory image. Long-duration stability and power-cycle
+recovery remain untested. See [camera setup](docs/camera_setup.md) for the evidence
+and README.md for the current node map and deployment status.
 
 Owner-approved visual direction: white background, deep blue text, simple sans-serif
 type and a small clam outline. Temperature readings must stay identifiable by

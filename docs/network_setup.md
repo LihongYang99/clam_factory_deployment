@@ -1,7 +1,8 @@
 # LAN address reservations
 
-Use DHCP on each device and reserve its address in the MikroTik router.
-One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
+Use DHCP on each ESP32 and the Jetson, with address reservations in the MikroTik
+router. One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
+Camera 06 uses a static address configured on the camera, with DHCP disabled.
 
 | Device | Address | Verification |
 | --- | --- | --- |
@@ -10,8 +11,14 @@ One board is one node; Node 01 uses `.101`, Node 02 `.102`, and so on.
 | Node 02 | `192.168.88.102` | Confirmed in serial diagnostics on 2026-11-10 |
 | Node 03 / 04 | `192.168.88.103` / `192.168.88.104` | Planned |
 | Node 05 | `192.168.88.105` | Planned reservation; identified board MAC `44:1B:F6:FE:71:50` |
-| Slot 06 / Node 07 | `192.168.88.106` / `192.168.88.107` | Planned; slot 06 reserved for camera |
+| [Camera 06](camera_setup.md) | `192.168.88.106` | Camera-configured static IP; MAC `00:12:35:02:DF:76`; live JPEG verified November 14, 2026 |
+| Node 07 | `192.168.88.107` | Planned |
 | Jetson Orin Nano | `192.168.88.250` | Owner confirmed `hostname -I` includes this address |
+
+The camera address must be excluded from conflicting DHCP assignments; router
+exclusion/reservation is still pending verification. Its previous factory address
+was `192.168.1.88`; the current stream uses `.106` and does not require the
+Jetson temporary `192.168.1.200` address. See [camera setup](camera_setup.md).
 
 ## Reserve an address
 

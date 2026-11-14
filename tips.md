@@ -81,3 +81,24 @@ is not automatically copied to the Jetson. Open the local Mac workspace for
 ESP32 USB flashing; use the remote window for gateway work on the Jetson.
 
 For DHCP and SSH troubleshooting, see [network setup](docs/network_setup.md).
+
+## Check Camera 06
+
+Camera 06 uses `192.168.88.106`, MAC `00:12:35:02:DF:76`, on router LAN port 4.
+Live JPEG delivery at this address was verified on November 14, 2026.
+Open **RGB camera** on the dashboard, or **http://localhost:8001/#camera** through
+an active home SSH tunnel.
+
+If the image is missing, run in the **Jetson SSH terminal**:
+
+```bash
+systemctl is-active clam-gateway
+curl -fsS --max-time 5 http://192.168.88.250:8000/api/camera
+ip neigh show 192.168.88.106
+```
+
+`live` means a frame arrived within the gateway freshness window. Repeat the
+status request after a few seconds and check that `received_at` advances, then
+confirm that the browser displays a current image. A ping response alone does
+not verify video. Keep the private RTSP URI out of screenshots and Git.
+See [camera setup](docs/camera_setup.md) for the dated verification and limits.

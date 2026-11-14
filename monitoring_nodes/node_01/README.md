@@ -84,7 +84,7 @@ calibration or compensation registers.
 - `firmware/node_01_do/arduino_secrets.example.h`: public configuration template.
 - `firmware/node_01_do/arduino_secrets.h`: local credentials, ignored by Git.
 - `tests/protocol_test.cpp`: manufacturer-example decoding and malformed-frame tests.
-- `../../web/`: the separate dashboard folder; frontend implementation is pending.
+- [Dashboard](../../web/README.md): the separate frontend, deployed with live Node 01 readings.
 
 The local Wi-Fi configuration has been prepared on the development Mac. Do not
 paste credentials into this README. On another computer, copy the example header
